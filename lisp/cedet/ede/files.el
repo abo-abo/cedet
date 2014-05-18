@@ -1,6 +1,6 @@
 ;;; ede/files.el --- Associate projects with files and directories.
 
-;; Copyright (C) 2008-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <eric@siege-engine.com>
 
@@ -156,6 +156,7 @@ If DIR is the root project, then it is the same."
 	 (proj (ede--inode-get-toplevel-open-project inode))
 	 (ans nil))
     ;; Try file based search.
+    ;; @FIXME - Can we dump this section?
     (when (not proj)
       (setq proj (ede-directory-get-toplevel-open-project ft)))
     ;; Default answer is this project
@@ -182,6 +183,8 @@ Does not check subprojects."
 	(setq all (cdr all)))
       found)))
 
+;; Force all users to switch to `ede-directory-get-open-project'
+;; for performance reasons.
 (defun ede-directory-get-toplevel-open-project (dir)
   "Return an already open toplevel project that is managing DIR."
   (let ((ft (file-name-as-directory (expand-file-name dir)))
@@ -248,44 +251,49 @@ Do this whenever a new project is created, as opposed to loaded."
 	       ede-project-directory-hash))
     ))
 
-(defun ede-directory-project-from-hash (dir)
+(defun ede--directory-project-from-hash (dir)
   "If there is an already loaded project for DIR, return it from the hash."
   (when (fboundp 'gethash)
     (gethash dir ede-project-directory-hash nil)))
 
-(defun ede-directory-project-add-description-to-hash (dir desc)
+(defun ede--directory-project-add-description-to-hash (dir desc)
   "Add to the EDE project hash DIR associated with DESC."
   (when (fboundp 'puthash)
     (puthash dir desc ede-project-directory-hash)
     desc))
 
 (defun ede-directory-project-p (dir &optional force)
-  "Return a project description object if DIR has a project.
+  "Return a project description object if DIR is in a project.
 Optional argument FORCE means to ignore a hash-hit of 'nomatch.
 This depends on an up to date `ede-project-class-files' variable.
 Any directory that contains the file .ede-ignore will always
 return nil."
   (when (not (file-exists-p (expand-file-name ".ede-ignore" dir)))
     (let* ((dirtest (expand-file-name dir))
-	   (match (ede-directory-project-from-hash dirtest)))
+	   (match (ede--directory-project-from-hash dirtest)))
       (cond
        ((and (eq match 'nomatch) (not force))
 	nil)
        ((and match (not (eq match 'nomatch)))
 	match)
        (t
-	(let ((types ede-project-class-files)
-	      (ret nil))
-	  ;; Loop over all types, loading in the first type that we find.
-	  (while (and types (not ret))
-	    (if (ede-dir-to-projectfile (car types) dirtest)
-		(progn
-		  ;; We found one!  Require it now since we will need it.
-		  (require (oref (car types) file))
-		  (setq ret (car types))))
-	    (setq types (cdr types)))
-	  (ede-directory-project-add-description-to-hash dirtest (or ret 'nomatch))
-	  ret))))))
+	(let* ((detect (ede-detect-directory-for-project dirtest))
+	       (ret (cdr detect)))
+	  ;;(let ((types ede-project-class-files)
+	  ;;      (ret nil))
+	  ;;  ;; Loop over all types, loading in the first type that we find.
+	  ;;  (while (and types (not ret))
+	  ;;    (if (ede-dir-to-projectfile (car types) dirtest)
+	  ;;	(progn
+	  ;;	  ;; We found one!  Require it now since we will need it.
+	  ;;	  (require (oref (car types) file))
+	  ;;	  (setq ret (car types))))
+	  ;;    (setq types (cdr types)))
+	  
+	  (when ret (require (oref ret file)))
+	  (ede--directory-project-add-description-to-hash dirtest (or ret 'nomatch))
+	  ret)
+	)))))
 
 ;;; TOPLEVEL
 ;;
@@ -303,43 +311,40 @@ nil is returned if the current directory is not a part of a project."
 
 (defun ede-toplevel-project (dir)
   "Starting with DIR, find the toplevel project directory."
-  (if (and (string= dir default-directory)
+  (let ((ans nil))
+
+    (cond
+   
+     ;; Check if it is cached in the current buffer.
+     ((and (string= dir default-directory)
 	   ede-object-root-project)
       ;; Try the local buffer cache first.
-      (oref ede-object-root-project :directory)
-    ;; Otherwise do it the hard way.
-    (let* ((thisdir (ede-directory-project-p dir))
-	   (ans (ede-directory-get-toplevel-open-project dir)))
-      (if (and ans ;; We have an answer
-	       (or (not thisdir) ;; this dir isn't setup
-		   (and (object-of-class-p ;; Same as class for this dir?
-			 ans (oref thisdir :class-sym)))
-		   ))
-	  (oref ans :directory)
-	(let* ((toppath (expand-file-name dir))
-	       (newpath toppath)
-	       (proj (ede-directory-project-p dir))
-	       (ans nil))
-	  (if proj
-	      ;; If we already have a project, ask it what the root is.
-	      (setq ans (ede-project-root-directory proj)))
+      (oref ede-object-root-project :directory))
 
-	  ;; If PROJ didn't know, or there is no PROJ, then
+     ;; See if there is an existing project in DIR.
+     ((setq ans (ede-directory-get-toplevel-open-project dir))
 
-	  ;; Loop up to the topmost project, and then load that single
-	  ;; project, and its sub projects.  When we are done, identify the
-	  ;; sub-project object belonging to file.
-	  (while (and (not ans) newpath proj)
-	    (setq toppath newpath
-		  newpath (ede-up-directory toppath))
-	    (when newpath
-	      (setq proj (ede-directory-project-p newpath)))
+      (oref ans :directory))
+     ;; NOTE: The below was the old impl - but we don't need the autoloader
+     ;; since we found a matching toplevel open project.  What?
+     ;; New file system detector is much better.
 
-	    (when proj
-	      ;; We can home someone in the middle knows too.
-	      (setq ans (ede-project-root-directory proj)))
-	    )
-	  (or ans toppath))))))
+      ;;let* ((auto (ede-directory-project-p dir)))
+      ;;	(if (and ans ;; We have an answer
+      ;;		 (or (not auto) ;; this dir detects ans an autoload.
+      ;;		     (and (object-of-class-p ;; Same as class for this dir?
+      ;;			   ans (oref auto :class-sym)))
+      ;;		     ))
+      ;;	    ;; Return directory of found item.
+      ;;	    (oref ans :directory))))
+
+     ;; Detect using our file system detector.
+     ((setq ans (ede-detect-directory-for-project dir))
+      (let ((dir (car ans))
+	    (auto (cdr ans)))
+
+	dir))
+     )))
 
 ;;; DIRECTORY CONVERSION STUFF
 ;;
