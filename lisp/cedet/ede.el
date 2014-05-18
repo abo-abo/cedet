@@ -1,6 +1,6 @@
 ;;; ede.el --- Emacs Development Environment gloss
 
-;; Copyright (C) 1998-2005, 2007-2013 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2005, 2007-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: project, make
@@ -45,6 +45,7 @@
 (require 'ede/source)
 (require 'ede/base)
 (require 'ede/auto)
+(require 'ede/detect)
 
 (load "ede/loaddefs" nil 'nomessage)
 
@@ -60,7 +61,7 @@
 (declare-function ede-up-directory "ede/files")
 (declare-function semantic-lex-make-spp-table "semantic/lex-spp")
 
-(defconst ede-version "1.2"
+(defconst ede-version "2.0"
   "Current version of the Emacs EDE.")
 
 ;;; Code:
@@ -502,23 +503,26 @@ Sets buffer local variables for EDE."
   (let* ((ROOT nil)
 	 (proj (ede-directory-get-open-project default-directory
 					       'ROOT))
-	 (projauto nil))
+	 (projdetect nil))
 
     (when (or proj ROOT
 	      ;; If there is no open project, look up the project
 	      ;; autoloader to see if we should initialize.
-	      (setq projauto (ede-directory-project-p default-directory t)))
+	      (setq projdetect (ede-detect-directory-for-project default-directory)))
 
-      (when (and (not proj) projauto)
+	      ;; @FIXME: old way 
+	      ;;(setq projauto (ede-directory-project-p default-directory t)))
+
+      (when (and (not proj) projdetect)
 
 	;; No project was loaded, but we have a project description
 	;; object.  This means that we can check if it is a safe
 	;; project to load before requesting it to be loaded.
 
-	(when (or (oref projauto safe-p)
+	(when (or (oref (cdr projdetect) safe-p)
 		  ;; The project style is not safe, so check if it is
 		  ;; in `ede-project-directories'.
-		  (let ((top (ede-toplevel-project default-directory)))
+		  (let ((top (car projdetect)))
 		    (ede-directory-safe-p top)))
 
 	  ;; The project is safe, so load it in.
@@ -786,7 +790,9 @@ Optional argument NAME is the name to give this project."
 					     (error
 					      "Unknown file name specifier %S"
 					      pf)))
-				:targets nil)))
+				:targets nil)
+		 
+		 ))
 	 (inits (oref obj initializers)))
     ;; Force the name to match for new objects.
     (eieio-object-set-name-string nobj (oref nobj :name))
@@ -1068,6 +1074,10 @@ On success, return the added project."
   (add-to-list 'ede-projects proj)
   proj)
 
+(defun ede-delete-project-from-global-list (proj)
+  "Remove project PROJ from the master list of projects."
+  (setq ede-projects (remove proj ede-projects)))
+
 (defun ede-flush-deleted-projects ()
   "Scan the projects list for projects which no longer exist.
 Flush the dead projects from the project cache."
@@ -1077,9 +1087,11 @@ Flush the dead projects from the project cache."
       (when (not (file-exists-p (oref P :file)))
 	(add-to-list 'dead P)))
     (dolist (D dead)
-      (setq ede-projects (remove D ede-projects)))
+      (ede-delete-project-from-global-list D))
     ))
 
+
+;; @FIXME - Can we obsolete this huge complicated thing?
 (defun ede-load-project-file (dir &optional rootreturn)
   "Project file independent way to read a project in from DIR.
 Optional ROOTRETURN will return the root project for DIR."
@@ -1121,6 +1133,13 @@ Optional ROOTRETURN will return the root project for DIR."
       ;; If not open yet, load it.
       (unless o
 	(let ((ede-constructing pfc))
+
+
+
+;;; TODO : make sure this is the only place ede-auto-load-project is called.
+;;;        make sure we never double load the project.  (See above like for
+;;;        object-assoc that should prevent.  Need to validate.
+
 	  (setq o (ede-auto-load-project pfc toppath))))
 
       ;; Return the found root project.
