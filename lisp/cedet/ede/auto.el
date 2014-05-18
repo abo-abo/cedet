@@ -1,6 +1,6 @@
 ;;; ede/auto.el --- Autoload features for EDE
 
-;; Copyright (C) 2010-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -119,6 +119,10 @@ into memory.")
 	 :documentation "The lisp file belonging to this class.")
    (proj-file :initarg :proj-file
 	      :documentation "Name of a project file of this type.")
+   (root-only :initarg :root-only
+	      :initform t ;; Default - majority case.
+	      :documentation
+	      "Non-nil if project detection only finds proj-file @ project root.")
    (proj-root-dirmatch :initarg :proj-root-dirmatch
 		       :initform ""
 		       :type (or string ede-project-autoload-dirmatch)
@@ -168,12 +172,14 @@ type is required and the load function used.")
    (ede-project-autoload "edeproject-makefile"
 			 :name "Make" :file 'ede/proj
 			 :proj-file "Project.ede"
+			 :root-only nil
 			 :load-type 'ede-proj-load
 			 :class-sym 'ede-proj-project
 			 :safe-p nil)
    (ede-project-autoload "edeproject-automake"
 			 :name "Automake" :file 'ede/proj
 			 :proj-file "Project.ede"
+			 :root-only nil
 			 :initializers '(:makefile-type Makefile.am)
 			 :load-type 'ede-proj-load
 			 :class-sym 'ede-proj-project
@@ -181,6 +187,7 @@ type is required and the load function used.")
    (ede-project-autoload "automake"
 			 :name "automake" :file 'ede/project-am
 			 :proj-file "Makefile.am"
+			 :root-only nil
 			 :load-type 'project-am-load
 			 :class-sym 'project-am-makefile
 			 :new-p nil
@@ -232,6 +239,48 @@ added.  Possible values are:
 		 (error "ede-project-class-files not initialized"))
 	       ;; Splice into the list.
 	       (setcdr prev (cons projauto next))))))))
+
+;;; Project Autoload Methods
+;;
+
+;; New method using detect.el
+(defmethod ede-auto-detect-in-dir ((this ede-project-autoload) dir)
+  "Return non-nil if THIS project autoload is found in DIR."
+  (let* ((d (file-name-as-directory dir))
+	 (pf (oref this proj-file))
+	 (f (when (stringp pf) (expand-file-name pf d))))
+    (and f (file-exists-p f))))
+
+(defmethod ede-auto-load-project ((this ede-project-autoload) dir)
+  "Load in the project associated with THIS project autoload description.
+THIS project description should be valid for DIR, where the project will
+be loaded."
+  ;; Last line of defense: don't load unsafe projects.
+  (when (not (or (oref this :safe-p)
+		 (ede-directory-safe-p dir)))
+    (error "Attempt to load an unsafe project (bug elsewhere in EDE)"))
+  ;; Things are good - so load the project.
+  (let ((o (funcall (oref this load-type) dir)))
+    (when (not o)
+      (error "Project type error: :load-type failed to create a project"))
+    (ede-add-project-to-global-list o)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;;; -------- Old Methods 
+;; See if we can do without them.
 
 ;;; EDE project-autoload methods
 ;;
@@ -296,6 +345,7 @@ the current buffer."
 	     (funcall rootfcn))))
 	))))
 
+;; @FIXME - can we obsolete this?
 (defmethod ede-dir-to-projectfile ((this ede-project-autoload) dir)
   "Return a full file name of project THIS found in DIR.
 Return nil if the project file does not exist."
@@ -319,20 +369,6 @@ Return nil if the project file does not exist."
 	 )
     (when (and f (file-exists-p f))
       f)))
-
-(defmethod ede-auto-load-project ((this ede-project-autoload) dir)
-  "Load in the project associated with THIS project autoload description.
-THIS project description should be valid for DIR, where the project will
-be loaded."
-  ;; Last line of defense: don't load unsafe projects.
-  (when (not (or (oref this :safe-p)
-		 (ede-directory-safe-p dir)))
-    (error "Attempt to load an unsafe project (bug elsewhere in EDE)"))
-  ;; Things are good - so load the project.
-  (let ((o (funcall (oref this load-type) dir)))
-    (when (not o)
-      (error "Project type error: :load-type failed to create a project"))
-    (ede-add-project-to-global-list o)))
 
 (provide 'ede/auto)
 
