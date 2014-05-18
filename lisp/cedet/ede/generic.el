@@ -1,6 +1,6 @@
 ;;; ede/generic.el --- Base Support for generic build systems
 
-;; Copyright (C) 2010-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <eric@siege-engine.com>
 
@@ -415,6 +415,7 @@ the class `ede-generic-project' project."
 			 :name external-name
 			 :file 'ede/generic
 			 :proj-file projectfile
+			 :root-only nil
 			 :load-type 'ede-generic-load
 			 :class-sym class
 			 :new-p nil
