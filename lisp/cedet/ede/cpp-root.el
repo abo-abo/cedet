@@ -1,6 +1,6 @@
 ;;; ede/cpp-root.el --- A simple way to wrap a C++ project with a single root
 
-;; Copyright (C) 2007-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <eric@siege-engine.com>
 
@@ -372,6 +372,7 @@ Each directory needs a project file to control it.")
 					    :directory 'ede-cpp-root-project-list)))
       ;; This is safe, because :directory isn't filled in till later.
       (when (and old (not (eq old this)))
+	(ede-delete-project-from-global-list old)
 	(delete-instance old)))
     ;; Basic initialization.
     (when (or (not (file-exists-p f))
