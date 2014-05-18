@@ -1,6 +1,6 @@
 ;;; ede/proj.el --- EDE Generic Project file driver
 
-;; Copyright (C) 1998-2003, 2007-2013 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2003, 2007-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: project, make
@@ -310,7 +310,7 @@ the PROJECT being read in is the root project."
 	(let ((sd (file-name-as-directory
 		   (expand-file-name (car subdirs) project))))
 	  (if (and (file-directory-p sd)
-		   (ede-directory-project-p sd))
+		   (file-exists-p (expand-file-name "Project.ede" sd)))
 	      (oset ret subproj
 		    (cons (ede-proj-load sd (or rootproj ret))
 			  (oref ret subproj))))
