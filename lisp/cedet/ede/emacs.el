@@ -1,6 +1,6 @@
 ;;; ede/emacs.el --- Special project for Emacs
 
-;; Copyright (C) 2008-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2014 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <eric@siege-engine.com>
 
@@ -38,37 +38,12 @@
 (declare-function semanticdb-refresh-table "semantic/db")
 
 ;;; Code:
-(defvar ede-emacs-project-list nil
-  "List of projects created by option `ede-emacs-project'.")
 
-(defun ede-emacs-file-existing (dir)
-  "Find a Emacs project in the list of Emacs projects.
-DIR is the directory to search from."
-  (let ((projs ede-emacs-project-list)
-	(ans nil))
-    (while (and projs (not ans))
-      (let ((root (ede-project-root-directory (car projs))))
-	(when (string-match (concat "^" (regexp-quote root))
-			    (file-name-as-directory dir))
-	  (setq ans (car projs))))
-      (setq projs (cdr projs)))
-    ans))
+;; @TODO - get rid of this.  Stuck in loaddefs right now.
 
-;;;###autoload
 (defun ede-emacs-project-root (&optional dir)
   "Get the root directory for DIR."
-  (when (not dir) (setq dir default-directory))
-  (let ((case-fold-search t)
-	(proj (ede-files-find-existing dir ede-emacs-project-list)))
-    (if proj
-	(ede-up-directory (file-name-directory
-			   (oref proj :file)))
-      ;; No pre-existing project.  Let's take a wild-guess if we have
-      ;; an Emacs project here.
-      (when (string-match "emacs[^/]*" dir)
-	(let ((base (substring dir 0 (match-end 0))))
-	  (when (file-exists-p (expand-file-name "src/emacs.c" base))
-	      base))))))
+  nil)
 
 (defun ede-emacs-version (dir)
   "Find the Emacs version for the Emacs src in DIR.
@@ -123,8 +98,8 @@ m4_define(\\[SXEM4CS_BETA_VERSION\\], \\[\\([0-9]+\\)\\])")
       ;; Return a tuple
       (cons emacs ver))))
 
-(defclass ede-emacs-project (ede-project eieio-instance-tracker)
-  ((tracking-symbol :initform 'ede-emacs-project-list)
+(defclass ede-emacs-project (ede-project)
+  (
    )
   "Project Type for the Emacs source code."
   :method-invocation-order :depth-first)
@@ -134,17 +109,16 @@ m4_define(\\[SXEM4CS_BETA_VERSION\\], \\[\\([0-9]+\\)\\])")
 Return nil if there isn't one.
 Argument DIR is the directory it is created for.
 ROOTPROJ is nil, since there is only one project."
-  (or (ede-files-find-existing dir ede-emacs-project-list)
-      ;; Doesn't already exist, so let's make one.
-      (let* ((vertuple (ede-emacs-version dir))
-	     (proj (ede-emacs-project
-		    (car vertuple)
-		    :name (car vertuple)
-		    :version (cdr vertuple)
-		    :directory (file-name-as-directory dir)
-		    :file (expand-file-name "src/emacs.c"
-					    dir))))
-	(ede-add-project-to-global-list proj))))
+  ;; Doesn't already exist, so let's make one.
+  (let* ((vertuple (ede-emacs-version dir))
+	 (proj (ede-emacs-project
+		(car vertuple)
+		:name (car vertuple)
+		:version (cdr vertuple)
+		:directory (file-name-as-directory dir)
+		:file (expand-file-name "src/emacs.c"
+					dir))))
+    (ede-add-project-to-global-list proj)))
 
 ;;;###autoload
 (ede-add-project-autoload
@@ -153,7 +127,6 @@ ROOTPROJ is nil, since there is only one project."
 		       :file 'ede/emacs
 		       :proj-file "src/emacs.c"
 		       :proj-root-dirmatch "emacs[^/]*"
-		       :proj-root 'ede-emacs-project-root
 		       :load-type 'ede-emacs-load
 		       :class-sym 'ede-emacs-project
 		       :new-p nil
