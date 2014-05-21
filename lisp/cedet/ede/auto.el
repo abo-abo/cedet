@@ -263,7 +263,9 @@ be loaded."
   (let ((o (funcall (oref this load-type) dir)))
     (when (not o)
       (error "Project type error: :load-type failed to create a project"))
-    (ede-add-project-to-global-list o)))
+    (ede-add-project-to-global-list o)
+    ;; @TODO - Add to hash over at `ede-inode-directory-hash'.
+    ))
 
 
 
@@ -284,70 +286,21 @@ be loaded."
 
 ;;; EDE project-autoload methods
 ;;
+
+;; @FIXME - delete from loaddefs to remove this.
 (defmethod ede-project-root ((this ede-project-autoload))
   "If a project knows its root, return it here.
 Allows for one-project-object-for-a-tree type systems."
   nil)
 
-(defun ede-project-dirmatch-p (file dirmatch)
-  "Return non-nil if FILE matches DIRMATCH.
-DIRMATCH could be nil (no match), a string (regexp match),
-or an `ede-project-autoload-dirmatch' object."
-  ;; If dirmatch is a string, then we simply match it against
-  ;; the file we are testing.
-  (if (stringp dirmatch)
-      (string-match dirmatch file)
-    ;; if dirmatch is instead a dirmatch object, we test against
-    ;; that object instead.
-    (if (ede-project-autoload-dirmatch-p dirmatch)
-	(ede-do-dirmatch dirmatch file)
-      (error "Unknown project directory match type."))
-    ))
-
-(defmethod ede-project-root-directory ((this ede-project-autoload)
-				       &optional file)
-  "If a project knows its root, return it here.
-Allows for one-project-object-for-a-tree type systems.
-Optional FILE is the file to test.  If there is no FILE, use
-the current buffer."
-  (when (not file)
-    (setq file default-directory))
-  (when (slot-boundp this :proj-root)
-    (let ((dirmatch (oref this proj-root-dirmatch))
-	  (rootfcn (oref this proj-root))
-	  (callfcn t))
-      (when rootfcn
-	(if ;; If the dirmatch (an object) is not installed, then we
-	    ;; always skip doing a match.
-	    (and (ede-project-autoload-dirmatch-p dirmatch)
-		 (not (ede-dirmatch-installed dirmatch)))
-	    (setq callfcn nil)
-	  ;; Other types of dirmatch:
-	  (when (and
-		 ;; If the Emacs Lisp file handling this project hasn't
-		 ;; been loaded, we will use the quick dirmatch feature.
-		 (not (featurep (oref this file)))
-		 ;; If the dirmatch is an empty string, then we always
-		 ;; skip doing a match.
-		 (not (and (stringp dirmatch) (string= dirmatch "")))
-		 )
-	    ;; If this file DOES NOT match dirmatch, we set the callfcn
-	    ;; to nil, meaning don't load the ede support file for this
-	    ;; type of project.  If it does match, we will load the file
-	    ;; and use a more accurate programmatic match from there.
-	    (unless (ede-project-dirmatch-p file dirmatch)
-	      (setq callfcn nil))))
-	;; Call into the project support file for a match.
-	(when callfcn
-	  (condition-case nil
-	      (funcall rootfcn file)
-	    (error
-	     (funcall rootfcn))))
-	))))
-
+;; @FIXME - delete from loaddefs to remove this.
+(defmethod ede-project-root-directory ((this ede-project-autoload) &optional file)
+  "" nil)
+					   
 ;; @FIXME - can we obsolete this?
 (defmethod ede-dir-to-projectfile ((this ede-project-autoload) dir)
   "Return a full file name of project THIS found in DIR.
+The file is the file that marks this project.
 Return nil if the project file does not exist."
   (let* ((d (file-name-as-directory dir))
 	 (root (ede-project-root-directory this d))
