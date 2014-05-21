@@ -1090,6 +1090,15 @@ Flush the dead projects from the project cache."
       (ede-delete-project-from-global-list D))
     ))
 
+(defun ede-find-project-in-global-list (dir)
+  "Find the open project for DIR."
+  (let ((ft (file-name-as-directory (expand-file-name dir)))
+	(all ede-projects)
+	(ans nil))
+    (while (and all (not ans))
+      (when (string= (oref (car all) :directory) ft)
+	(setq ans (car all)))
+      (setq all (cdr all)))))
 
 ;; @FIXME - Can we obsolete this huge complicated thing?
 (defun ede-load-project-file (dir &optional rootreturn)
@@ -1097,58 +1106,49 @@ Flush the dead projects from the project cache."
 Optional ROOTRETURN will return the root project for DIR."
   ;; Only load if something new is going on.  Flush the dirhash.
   (ede-project-directory-remove-hash dir)
+
   ;; Do the load
   ;;(message "EDE LOAD : %S" file)
   (let* ((file dir)
 	 (path (file-name-as-directory (expand-file-name dir)))
-	 (pfc (ede-directory-project-p path))
+	 (detect (ede-directory-project-cons path))
+	 (autoloader nil)
 	 (toppath nil)
 	 (o nil))
     (cond
-     ((not pfc)
-      ;; @TODO - Do we really need to scan?  Is this a waste of time?
-      ;; Scan upward for a the next project file style.
-      (let ((p path))
-	(while (and p (not (ede-directory-project-p p)))
-	  (setq p (ede-up-directory p)))
-	(if p (ede-load-project-file p)
-	  nil)
-	;; recomment as we go
-	;;nil
-	))
      ;; Do nothing if we are building an EDE project already.
      (ede-constructing
       nil)
+
      ;; Load in the project in question.
-     (t
-      (setq toppath (ede-toplevel-project path))
-      ;; We found the top-most directory.  Check to see if we already
-      ;; have an object defining its project.
-      (setq pfc (ede-directory-project-p toppath t))
+     (detect
+      (setq toppath (car detect))
+      (setq autoloader (cdr detect))
 
       ;; See if it's been loaded before
-      (setq o (object-assoc (ede-dir-to-projectfile pfc toppath) 'file
-			    ede-projects))
+      (setq o (ede-find-project-in-global-list toppath))
 
       ;; If not open yet, load it.
       (unless o
-	(let ((ede-constructing pfc))
-
-
+	(let ((ede-constructing autoloader))
 
 ;;; TODO : make sure this is the only place ede-auto-load-project is called.
 ;;;        make sure we never double load the project.  (See above like for
 ;;;        object-assoc that should prevent.  Need to validate.
 
-	  (setq o (ede-auto-load-project pfc toppath))))
+	  (setq o (ede-auto-load-project autoloader toppath))))
 
       ;; Return the found root project.
       (when rootreturn (set rootreturn o))
 
+      ;; The project has been found (in the global list) or loaded from
+      ;; disk (via autoloader.)  We can now search for the project asked
+      ;; for from DIR in the sub-list.
+
+      ;; @TODO - could I use ede-find-subproject-for-directory ??
       (let (tocheck found)
-	;; Now find the project file belonging to FILE!
 	(setq tocheck (list o))
-	(setq file (ede-dir-to-projectfile pfc (expand-file-name path)))
+	(setq file (ede-dir-to-projectfile autoloader (expand-file-name path)))
 	(while (and tocheck (not found))
 	  (let ((newbits nil))
 	    (when (car tocheck)
@@ -1169,7 +1169,6 @@ Optional ROOTRETURN will return the root project for DIR."
 ;;
 ;; Moving between relative projects.  Associating between buffers and
 ;; projects.
-
 (defun ede-parent-project (&optional obj)
   "Return the project belonging to the parent directory.
 Return nil if there is no previous directory.
