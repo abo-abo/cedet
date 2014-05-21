@@ -83,43 +83,11 @@ of the anchor file for the project."
   (file-name-directory (expand-file-name (oref this file))))
 
 
-(defmethod ede--project-inode ((proj ede-project-placeholder))
-  "Get the inode of the directory project PROJ is in."
-  (if (slot-boundp proj 'dirinode)
-      (oref proj dirinode)
-    (oset proj dirinode (ede--inode-for-dir (oref proj :directory)))))
+;; Why INODEs?
+;; An inode represents is a unique id that trancends symlinks, hardlinks, etc
+;; so when we cache an inode in a project, and hash directories to inodes, we
+;; can avoid costly queries and regex matches.
 
-(defmethod ede-find-subproject-for-directory ((proj ede-project-placeholder)
-					      dir)
-  "Find a subproject of PROJ that corresponds to DIR."
-  (if ede--disable-inode
-      (let ((ans nil))
-	;; Try to find the right project w/out inodes.
-	(ede-map-subprojects
-	 proj
-	 (lambda (SP)
-	   (when (not ans)
-	     (if (string= (file-truename dir) (oref SP :directory))
-		 (setq ans SP)
-	       (ede-find-subproject-for-directory SP dir)))))
-	ans)
-    ;; We can use inodes, so let's try it.
-    (let ((ans nil)
-	  (inode (ede--inode-for-dir dir)))
-      (ede-map-subprojects
-       proj
-       (lambda (SP)
-	 (when (not ans)
-	   (if (equal (ede--project-inode SP) inode)
-	       (setq ans SP)
-	     (setq ans (ede-find-subproject-for-directory SP dir))))))
-      ans)))
-
-;;; DIRECTORY IN OPEN PROJECT
-;;
-;; These routines match some directory name to one of the many pre-existing
-;; open projects.  This should avoid hitting the disk, or asking lots of questions
-;; if used throughout the other routines.
 (defvar ede-inode-directory-hash (make-hash-table
 				  ;; Note on test.  Can we compare inodes or something?
 				  :test 'equal)
@@ -147,6 +115,32 @@ of the anchor file for the project."
 	    (ede--put-inode-dir-hash dir (nth 10 fattr))
 	    )))))
 
+(defmethod ede--project-inode ((proj ede-project-placeholder))
+  "Get the inode of the directory project PROJ is in."
+  (if (slot-boundp proj 'dirinode)
+      (oref proj dirinode)
+    (oset proj dirinode (ede--inode-for-dir (oref proj :directory)))))
+
+(defun ede--inode-get-toplevel-open-project (inode)
+  "Return an already open toplevel project that is managing INODE.
+Does not check subprojects."
+  (when (or (and (numberp inode) (/= inode 0))
+	    (consp inode))
+    (let ((all ede-projects)
+	  (found nil)
+	  )
+      (while (and all (not found))
+	(when (equal inode (ede--project-inode (car all)))
+	  (setq found (car all)))
+	(setq all (cdr all)))
+      found)))
+
+;;; DIRECTORY IN OPEN PROJECT
+;;
+;; These routines match some directory name to one of the many pre-existing
+;; open projects.  This should avoid hitting the disk, or asking lots of questions
+;; if used throughout the other routines.
+
 (defun ede-directory-get-open-project (dir &optional rootreturn)
   "Return an already open project that is managing DIR.
 Optional ROOTRETURN specifies a symbol to set to the root project.
@@ -168,20 +162,6 @@ If DIR is the root project, then it is the same."
 			(not (equal inode (ede--project-inode proj)))))
       (setq ans (ede-find-subproject-for-directory proj ft)))
     ans))
-
-(defun ede--inode-get-toplevel-open-project (inode)
-  "Return an already open toplevel project that is managing INODE.
-Does not check subprojects."
-  (when (or (and (numberp inode) (/= inode 0))
-	    (consp inode))
-    (let ((all ede-projects)
-	  (found nil)
-	  )
-      (while (and all (not found))
-	(when (equal inode (ede--project-inode (car all)))
-	  (setq found (car all)))
-	(setq all (cdr all)))
-      found)))
 
 ;; Force all users to switch to `ede-directory-get-open-project'
 ;; for performance reasons.
@@ -219,6 +199,32 @@ Does not check subprojects."
 	 ))
       (setq all (cdr all)))
     ans))
+
+(defmethod ede-find-subproject-for-directory ((proj ede-project-placeholder)
+					      dir)
+  "Find a subproject of PROJ that corresponds to DIR."
+  (if ede--disable-inode
+      (let ((ans nil))
+	;; Try to find the right project w/out inodes.
+	(ede-map-subprojects
+	 proj
+	 (lambda (SP)
+	   (when (not ans)
+	     (if (string= (file-truename dir) (oref SP :directory))
+		 (setq ans SP)
+	       (ede-find-subproject-for-directory SP dir)))))
+	ans)
+    ;; We can use inodes, so let's try it.
+    (let ((ans nil)
+	  (inode (ede--inode-for-dir dir)))
+      (ede-map-subprojects
+       proj
+       (lambda (SP)
+	 (when (not ans)
+	   (if (equal (ede--project-inode SP) inode)
+	       (setq ans SP)
+	     (setq ans (ede-find-subproject-for-directory SP dir))))))
+      ans)))
 
 ;;; DIRECTORY-PROJECT-P
 ;;
