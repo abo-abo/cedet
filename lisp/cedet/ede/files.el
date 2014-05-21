@@ -185,6 +185,11 @@ Does not check subprojects."
 
 ;; Force all users to switch to `ede-directory-get-open-project'
 ;; for performance reasons.
+(defun ede-directory-get-toplevel-open-project-new (dir)
+  "Return an already open toplevel project that is managing DIR."
+  (let ((detect (ede-directory-project-cons dir)))
+    (car detect)))
+
 (defun ede-directory-get-toplevel-open-project (dir)
   "Return an already open toplevel project that is managing DIR."
   (let ((ft (file-name-as-directory (expand-file-name dir)))
@@ -268,6 +273,17 @@ Optional argument FORCE means to ignore a hash-hit of 'nomatch.
 This depends on an up to date `ede-project-class-files' variable.
 Any directory that contains the file .ede-ignore will always
 return nil."
+  ;; @TODO - We used to have a full impl here, but moved it all
+  ;;         to ede-directory-project-cons, and now hash contains only
+  ;;         the results of detection which includes the root dir.
+  ;;         Perhaps we can eventually remove this fcn?
+  (let ((detect (ede-directory-project-cons dir force)))
+    (cdr detect)))
+
+(defun ede-directory-project-cons (dir &optional force)
+  "Return a project CONS (ROOTDIR . AUTOLOAD) for DIR.
+If there is no project in DIR, return nil.
+Optional FORCE means to ignore the hash of known directories."
   (when (not (file-exists-p (expand-file-name ".ede-ignore" dir)))
     (let* ((dirtest (expand-file-name dir))
 	   (match (ede--directory-project-from-hash dirtest)))
@@ -277,23 +293,15 @@ return nil."
        ((and match (not (eq match 'nomatch)))
 	match)
        (t
+	;; First time here?  Use the detection code to identify if we have
+	;; a project here.
 	(let* ((detect (ede-detect-directory-for-project dirtest))
-	       (ret (cdr detect)))
-	  ;;(let ((types ede-project-class-files)
-	  ;;      (ret nil))
-	  ;;  ;; Loop over all types, loading in the first type that we find.
-	  ;;  (while (and types (not ret))
-	  ;;    (if (ede-dir-to-projectfile (car types) dirtest)
-	  ;;	(progn
-	  ;;	  ;; We found one!  Require it now since we will need it.
-	  ;;	  (require (oref (car types) file))
-	  ;;	  (setq ret (car types))))
-	  ;;    (setq types (cdr types)))
-	  
-	  (when ret (require (oref ret file)))
-	  (ede--directory-project-add-description-to-hash dirtest (or ret 'nomatch))
-	  ret)
+	       (autoloader (cdr detect))) ;; autoloader
+	  (when autoloader (require (oref autoloader file)))
+	  (ede--directory-project-add-description-to-hash dirtest (or detect 'nomatch))
+	  detect)
 	)))))
+  
 
 ;;; TOPLEVEL
 ;;
