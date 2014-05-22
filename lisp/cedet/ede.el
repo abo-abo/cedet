@@ -1090,17 +1090,6 @@ Flush the dead projects from the project cache."
       (ede-delete-project-from-global-list D))
     ))
 
-(defun ede-find-project-in-global-list (dir)
-  "Find the open project for DIR."
-  (let ((ft (file-name-as-directory (expand-file-name dir)))
-	(all ede-projects)
-	(ans nil))
-    (while (and all (not ans))
-      (when (string= (oref (car all) :directory) ft)
-	(setq ans (car all)))
-      (setq all (cdr all)))))
-
-;; @FIXME - Can we obsolete this huge complicated thing?
 (defun ede-load-project-file (dir &optional rootreturn)
   "Project file independent way to read a project in from DIR.
 Optional ROOTRETURN will return the root project for DIR."
@@ -1126,7 +1115,7 @@ Optional ROOTRETURN will return the root project for DIR."
       (setq autoloader (cdr detect))
 
       ;; See if it's been loaded before
-      (setq o (ede-find-project-in-global-list toppath))
+      (setq o (ede-directory-get-toplevel-open-project toppath))
 
       ;; If not open yet, load it.
       (unless o
