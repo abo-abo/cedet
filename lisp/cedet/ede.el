@@ -502,45 +502,50 @@ Sets buffer local variables for EDE."
   ;; Init the buffer.
   (let* ((ROOT nil)
 	 (proj (ede-directory-get-open-project default-directory
-					       'ROOT))
-	 (projdetect nil))
+					       'ROOT)))
 
-    (when (or proj ROOT
-	      ;; If there is no open project, look up the project
-	      ;; autoloader to see if we should initialize.
-	      (setq projdetect (ede-detect-directory-for-project default-directory)))
+    (when (not proj)
+      ;; If there is no open project, look up the project
+      ;; autoloader to see if we should initialize.
+      (let ((projdetect (ede-detect-directory-for-project default-directory)))
 
-	      ;; @FIXME: old way 
-	      ;;(setq projauto (ede-directory-project-p default-directory t)))
+	(when projdetect
+	  ;; No project was loaded, but we have a project description
+	  ;; object.  This means that we try to load it.
+	  ;; 
+	  ;; Before loading, we need to check if it is a safe
+	  ;; project to load before requesting it to be loaded.
 
-      (when (and (not proj) projdetect)
+	  (when (or (oref (cdr projdetect) safe-p)
+		    ;; The project style is not safe, so check if it is
+		    ;; in `ede-project-directories'.
+		    (let ((top (car projdetect)))
+		      (ede-directory-safe-p top)))
 
-	;; No project was loaded, but we have a project description
-	;; object.  This means that we can check if it is a safe
-	;; project to load before requesting it to be loaded.
+	    ;; The project is safe, so load it in.
+	    (setq proj (ede-load-project-file default-directory 'ROOT))))))
 
-	(when (or (oref (cdr projdetect) safe-p)
-		  ;; The project style is not safe, so check if it is
-		  ;; in `ede-project-directories'.
-		  (let ((top (car projdetect)))
-		    (ede-directory-safe-p top)))
+    ;; If PROJ is now loaded in, we can initialize our buffer to it.
+    (when proj
 
-	  ;; The project is safe, so load it in.
-	  (setq proj (ede-load-project-file default-directory 'ROOT))))
-
-      ;; Only initialize EDE state in this buffer if we found a project.
-      (when proj
-
-	(setq ede-object (ede-buffer-object (current-buffer)
+      ;; ede-object represents the specific EDE related class that best
+      ;; represents this buffer.  It could be a project (for a project file)
+      ;; or a target.  Also save off ede-object-project, the project that
+      ;; the buffer belongs to for the case where ede-object is a target.
+      (setq ede-object (ede-buffer-object (current-buffer)
 					  'ede-object-project))
 
-	(setq ede-object-root-project
-	      (or ROOT (ede-project-root ede-object-project)))
+      ;; Every project has a root.  It might be the same as ede-object.
+      ;; Cache that also as the root is a very common thing to need.
+      (setq ede-object-root-project
+	    (or ROOT (ede-project-root ede-object-project)))
 
-	(if (and (not ede-object) ede-object-project)
-	    (ede-auto-add-to-target))
+      ;; Check to see if we want to add this buffer to a target.
+      (if (and (not ede-object) ede-object-project)
+	  (ede-auto-add-to-target))
 
-	(ede-apply-target-options)))))
+      ;; Apply any options from the found target.
+      (ede-apply-target-options))))
 
 (defun ede-reset-all-buffers ()
   "Reset all the buffers due to change in EDE."
@@ -929,6 +934,8 @@ Optional argument FORCE forces the file to be removed without asking."
   (interactive)
   (ede-invoke-method 'project-edit-file-target))
 
+;;; Compilation / Debug / Run
+;;
 (defun ede-compile-project ()
   "Compile the current project."
   (interactive)
@@ -1109,49 +1116,48 @@ Flush the dead projects from the project cache."
 (defun ede-load-project-file (dir &optional rootreturn)
   "Project file independent way to read a project in from DIR.
 Optional ROOTRETURN will return the root project for DIR."
-  ;; Only load if something new is going on.  Flush the dirhash.
-  (ede-project-directory-remove-hash dir)
+  ;; Don't do anything if we are in the process of
+  ;; constructing an EDE object.
+  ;;
+  ;; Prevent recursion.
+  (unless ede-constructing
 
-  ;; Do the load
-  ;;(message "EDE LOAD : %S" file)
-  (let* ((file dir)
-	 (path (file-name-as-directory (expand-file-name dir)))
-	 (detect (ede-directory-project-cons path))
-	 (autoloader nil)
-	 (toppath nil)
-	 (o nil))
-    (cond
-     ;; Do nothing if we are building an EDE project already.
-     (ede-constructing
-      nil)
+    ;; Only load if something new is going on.  Flush the dirhash.
+    (ede-project-directory-remove-hash dir)
 
-     ;; Load in the project in question.
-     (detect
-      (setq toppath (car detect))
-      (setq autoloader (cdr detect))
+    ;; Do the load
+    ;;(message "EDE LOAD : %S" file)
+    (let* ((file dir)
+	   (path (file-name-as-directory (expand-file-name dir)))
+	   (detect (ede-directory-project-cons path))
+	   (autoloader nil)
+	   (toppath nil)
+	   (o nil))
 
-      ;; See if it's been loaded before
-      (setq o (ede-directory-get-toplevel-open-project toppath))
+      (when detect
+	(setq toppath (car detect))
+	(setq autoloader (cdr detect))
 
-      ;; If not open yet, load it.
-      (unless o
-	(let ((ede-constructing autoloader))
+	;; See if it's been loaded before
+	(setq o (ede-directory-get-toplevel-open-project toppath))
 
-;;; TODO : make sure this is the only place ede-auto-load-project is called.
-;;;        make sure we never double load the project.  (See above like for
-;;;        object-assoc that should prevent.  Need to validate.
+	;; If not open yet, load it.
+	(unless o
+	  (let ((ede-constructing autoloader))
 
-	  (setq o (ede-auto-load-project autoloader toppath))))
+	    ;; This is the only place `ede-auto-load-project' should be called.
 
-      ;; Return the found root project.
-      (when rootreturn (set rootreturn o))
+	    (setq o (ede-auto-load-project autoloader toppath))))
 
-      ;; The project has been found (in the global list) or loaded from
-      ;; disk (via autoloader.)  We can now search for the project asked
-      ;; for from DIR in the sub-list.
-      (ede-find-subproject-for-directory o path)
+	;; Return the found root project.
+	(when rootreturn (set rootreturn o))
 
-      ))))
+	;; The project has been found (in the global list) or loaded from
+	;; disk (via autoloader.)  We can now search for the project asked
+	;; for from DIR in the sub-list.
+	(ede-find-subproject-for-directory o path)
+
+	))))
 
 ;;; PROJECT ASSOCIATIONS
 ;;
