@@ -1133,26 +1133,9 @@ Optional ROOTRETURN will return the root project for DIR."
       ;; The project has been found (in the global list) or loaded from
       ;; disk (via autoloader.)  We can now search for the project asked
       ;; for from DIR in the sub-list.
+      (ede-find-subproject-for-directory o path)
 
-      ;; @TODO - could I use ede-find-subproject-for-directory ??
-      (let (tocheck found)
-	(setq tocheck (list o))
-	(setq file (ede-dir-to-projectfile autoloader (expand-file-name path)))
-	(while (and tocheck (not found))
-	  (let ((newbits nil))
-	    (when (car tocheck)
-	      (if (string= file (oref (car tocheck) file))
-		  (setq found (car tocheck)))
-	      (setq newbits (oref (car tocheck) subproj)))
-	    (setq tocheck
-		  (append (cdr tocheck) newbits))))
-	(if (not found)
-	    (message "No project for %s, but passes project-p test" file)
-	  ;; Now that the file has been reset inside the project object, do
-	  ;; the cache maintenance.
-	  (setq ede-project-cache-files
-		(delete (oref found file) ede-project-cache-files)))
-	found)))))
+      ))))
 
 ;;; PROJECT ASSOCIATIONS
 ;;
