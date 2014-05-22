@@ -166,11 +166,6 @@ If DIR is the root project, then it is the same."
 
 ;; Force all users to switch to `ede-directory-get-open-project'
 ;; for performance reasons.
-(defun ede-directory-get-toplevel-open-project-new (dir)
-  "Return an already open toplevel project that is managing DIR."
-  (let ((detect (ede-directory-project-cons dir)))
-    (car detect)))
-
 (defun ede-directory-get-toplevel-open-project (dir)
   "Return an already open toplevel project that is managing DIR."
   (let ((ft (file-name-as-directory (expand-file-name dir)))
