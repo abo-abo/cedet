@@ -249,12 +249,16 @@ added.  Possible values are:
   (let* ((d (file-name-as-directory dir))
 	 (pf (oref this proj-file))
 	 (f (when (stringp pf) (expand-file-name pf d))))
+    ;; @TODO - ADD DIRMATCH BEHaVIOR BACK In HERE!
+    ;;         ADD A CACHE IN DIRMATCH WHILE WE'RE AT IT.
     (and f (file-exists-p f))))
 
 (defmethod ede-auto-load-project ((this ede-project-autoload) dir)
   "Load in the project associated with THIS project autoload description.
 THIS project description should be valid for DIR, where the project will
-be loaded."
+be loaded.
+
+NOTE: Do not call this - it should only be called from `ede-load-project-file'."
   ;; Last line of defense: don't load unsafe projects.
   (when (not (or (oref this :safe-p)
 		 (ede-directory-safe-p dir)))
@@ -272,20 +276,8 @@ be loaded."
 
 
 
-
-
-
-
-
-
-
-
-
 ;;; -------- Old Methods 
 ;; See if we can do without them.
-
-;;; EDE project-autoload methods
-;;
 
 ;; @FIXME - delete from loaddefs to remove this.
 (defmethod ede-project-root ((this ede-project-autoload))
@@ -296,32 +288,6 @@ Allows for one-project-object-for-a-tree type systems."
 ;; @FIXME - delete from loaddefs to remove this.
 (defmethod ede-project-root-directory ((this ede-project-autoload) &optional file)
   "" nil)
-					   
-;; @FIXME - can we obsolete this?
-(defmethod ede-dir-to-projectfile ((this ede-project-autoload) dir)
-  "Return a full file name of project THIS found in DIR.
-The file is the file that marks this project.
-Return nil if the project file does not exist."
-  (let* ((d (file-name-as-directory dir))
-	 (root (ede-project-root-directory this d))
-	 (pf (oref this proj-file))
-	 (dm (oref this proj-root-dirmatch))
-	 (f (cond ((stringp pf)
-		   (expand-file-name pf (or root d)))
-		  ((and (symbolp pf) (fboundp pf))
-		   ;; If there is a symbol to call, lets make extra
-		   ;; sure we really can call it without loading in
-		   ;; other EDE projects.  This happens if the file is
-		   ;; already loaded, or if there is a dirmatch, but
-		   ;; root is empty.
-		   (when (and (featurep (oref this file))
-			      (or (not (stringp dm))
-				  (not (string= dm "")))
-			      root)
-		     (funcall pf (or root d))))))
-	 )
-    (when (and f (file-exists-p f))
-      f)))
 
 (provide 'ede/auto)
 
