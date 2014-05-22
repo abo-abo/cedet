@@ -80,13 +80,14 @@ Allows for one-project-object-for-a-tree type systems."
 Allows for one-project-object-for-a-tree type systems.
 Optional FILE is the file to test.  It is ignored in preference
 of the anchor file for the project."
-  (file-name-directory (expand-file-name (oref this file))))
+  (let ((root (or (ede-project-root this) this)))
+    (file-name-directory (expand-file-name (oref this file)))))
 
 
 ;; Why INODEs?
 ;; An inode represents is a unique id that trancends symlinks, hardlinks, etc
 ;; so when we cache an inode in a project, and hash directories to inodes, we
-;; can avoid costly queries and regex matches.
+;; can avoid costly filesystem queries and regex matches.
 
 (defvar ede-inode-directory-hash (make-hash-table
 				  ;; Note on test.  Can we compare inodes or something?
@@ -192,6 +193,8 @@ If DIR is the root project, then it is the same."
 	    (and (not (eql pin 0)) (equal pin inode)))
 	  (setq ans (car all)))
 	 ;; Subdir via truename - slower by far, but faster than a traditional lookup.
+	 ;; Note that we must resort to truename in order to resolve issues such as
+	 ;; cross-symlink projects.
 	 ((let ((ftn (file-truename ft))
 		(ptd (file-truename (oref (car all) :directory))))
 	    (string-match (concat "^" (regexp-quote ptd)) ftn))
@@ -226,10 +229,12 @@ If DIR is the root project, then it is the same."
 	     (setq ans (ede-find-subproject-for-directory SP dir))))))
       ans)))
 
-;;; DIRECTORY-PROJECT-P
+;;; DIRECTORY HASH
 ;;
-;; For a fresh buffer, or for a path w/ no open buffer, use this
-;; routine to determine if there is a known project type here.
+;; The directory hash matches expanded directory names to already detected
+;; projects.  By hashing projects to directories, we can detect projects in
+;; places we have been before much more quickly.
+
 (defvar ede-project-directory-hash (make-hash-table
 				    ;; Note on test.  Can we compare inodes or something?
 				    :test 'equal)
@@ -251,7 +256,7 @@ Do this only when developing new projects that are incorrectly putting
   "Reset the directory hash for DIR.
 Do this whenever a new project is created, as opposed to loaded."
   ;; TODO - Use maphash, and delete by regexp, not by dir searching!
-
+  (setq dir (expand-file-name dir))
   (when (fboundp 'remhash)
     (remhash (file-name-as-directory dir) ede-project-directory-hash)
     ;; Look for all subdirs of D, and remove them.
@@ -265,20 +270,32 @@ Do this whenever a new project is created, as opposed to loaded."
 (defun ede--directory-project-from-hash (dir)
   "If there is an already loaded project for DIR, return it from the hash."
   (when (fboundp 'gethash)
+    (setq dir (expand-file-name dir))
     (gethash dir ede-project-directory-hash nil)))
 
 (defun ede--directory-project-add-description-to-hash (dir desc)
   "Add to the EDE project hash DIR associated with DESC."
   (when (fboundp 'puthash)
+    (setq dir (expand-file-name dir))
     (puthash dir desc ede-project-directory-hash)
     desc))
 
+;;; DIRECTORY-PROJECT-P, -CONS
+;;
+;; These routines are useful for detecting if a project exists
+;; in a provided directory.
+;;
+;; Note that -P provides less information than -CONS, so use -CONS
+;; instead so that -P can be obsoleted.
 (defun ede-directory-project-p (dir &optional force)
   "Return a project description object if DIR is in a project.
 Optional argument FORCE means to ignore a hash-hit of 'nomatch.
 This depends on an up to date `ede-project-class-files' variable.
 Any directory that contains the file .ede-ignore will always
-return nil."
+return nil.
+
+Consider using `ede-directory-project-cons' instead if the next
+question you want to ask is where the root of found project is."
   ;; @TODO - We used to have a full impl here, but moved it all
   ;;         to ede-directory-project-cons, and now hash contains only
   ;;         the results of detection which includes the root dir.
@@ -313,22 +330,15 @@ Optional FORCE means to ignore the hash of known directories."
 ;;
 ;; These utilities will identify the "toplevel" of a project.
 ;;
-(defun ede-toplevel-project-or-nil (dir)
-  "Starting with DIR, find the toplevel project directory, or return nil.
-nil is returned if the current directory is not a part of a project."
-  (let* ((ans (ede-directory-get-toplevel-open-project dir)))
-    (if ans
-	(oref ans :directory)
-      (if (ede-directory-project-p dir)
-	  (ede-toplevel-project dir)
-	nil))))
+;; NOTE: These two -toplevel- functions return a directory even though
+;;       the function name implies a project.
 
 (defun ede-toplevel-project (dir)
-  "Starting with DIR, find the toplevel project directory."
+  "Starting with DIR, find the toplevel project directory.
+If DIR is not part of a project, return nil."
   (let ((ans nil))
 
     (cond
-   
      ;; Check if it is cached in the current buffer.
      ((and (string= dir default-directory)
 	   ede-object-root-project)
@@ -337,28 +347,15 @@ nil is returned if the current directory is not a part of a project."
 
      ;; See if there is an existing project in DIR.
      ((setq ans (ede-directory-get-toplevel-open-project dir))
-
       (oref ans :directory))
-     ;; NOTE: The below was the old impl - but we don't need the autoloader
-     ;; since we found a matching toplevel open project.  What?
-     ;; New file system detector is much better.
-
-      ;;let* ((auto (ede-directory-project-p dir)))
-      ;;	(if (and ans ;; We have an answer
-      ;;		 (or (not auto) ;; this dir detects ans an autoload.
-      ;;		     (and (object-of-class-p ;; Same as class for this dir?
-      ;;			   ans (oref auto :class-sym)))
-      ;;		     ))
-      ;;	    ;; Return directory of found item.
-      ;;	    (oref ans :directory))))
 
      ;; Detect using our file system detector.
      ((setq ans (ede-detect-directory-for-project dir))
-      (let ((dir (car ans))
-	    (auto (cdr ans)))
+      (car ans))
 
-	dir))
-     )))
+     (t nil))))
+
+(defalias 'ede-toplevel-project-or-nil 'ede-toplevel-project)
 
 ;;; DIRECTORY CONVERSION STUFF
 ;;
@@ -528,6 +525,8 @@ Argument DIR is the directory to trim upwards."
 	nil
       fnd)))
 
+;;; @FIXME - The below should now be obsolete now that the detect.el package
+;;           uses the same technique.  Can we obsolete it?
 (defun ede-find-project-root (prj-file-name &optional dir)
   "Tries to find directory with given project file"
   (let ((prj-dir (locate-dominating-file (or dir default-directory)
@@ -535,6 +534,8 @@ Argument DIR is the directory to trim upwards."
     (when prj-dir
       (expand-file-name prj-dir))))
 
+;;; @FIXME - I think `ede-directory-get-toplevel-open-project' does this.
+;;           Can we obsolete it?
 (defun ede-files-find-existing (dir prj-list)
   "Find a project in the list of projects stored in given variable.
 DIR is the directory to search from."
