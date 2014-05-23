@@ -94,11 +94,16 @@ into memory.")
 		    (setq matchstring
 			  (match-string (or (oref dirmatch configregexidx) 0)))))
 		(if (not buff) (kill-buffer readbuff))))
-	    ;; Save what we find in our cache.
-	    (oset dirmatch configdatastash matchstring))
+	    ;; Convert matchstring to a regexp
+	    (setq matchstring (concat "^" (regexp-quote matchstring)))
+	    ;; Stash it for later.
+	    (oset dirmatch configdatastash matchstring)
+	    ;; Debug
+	    ;;(message "Stashing config data for dirmatch %S as %S" (eieio-object-name dirmatch) matchstring)
+	    )
 	  ;; Match against our discovered string
-	  (and matchstring (string-match (regexp-quote matchstring) file))
-	  )))
+	  (and matchstring (string-match matchstring
+					 (expand-file-name file))))))
 
      ;; Add new matches here
      ;; ((stringp somenewslot ...)
@@ -124,12 +129,12 @@ into memory.")
 	      :documentation
 	      "Non-nil if project detection only finds proj-file @ project root.")
    (proj-root-dirmatch :initarg :proj-root-dirmatch
-		       :initform ""
-		       :type (or string ede-project-autoload-dirmatch)
+		       :initform nil
+		       :type (or null string ede-project-autoload-dirmatch)
 		       :documentation
 		       "To avoid loading a project, check if the directory matches this.
-For projects that use directory name matches, a function would load that project.
-Specifying this matcher will allow EDE to check without loading the project.")
+Specifying this matcher object will  allow EDE to perform a complex
+check without loading the project.") 
    (proj-root :initarg :proj-root
 	      :type function
 	      :documentation "A function symbol to call for the project root.
@@ -249,9 +254,17 @@ added.  Possible values are:
   (let* ((d (file-name-as-directory dir))
 	 (pf (oref this proj-file))
 	 (f (when (stringp pf) (expand-file-name pf d))))
-    ;; @TODO - ADD DIRMATCH BEHaVIOR BACK In HERE!
-    ;;         ADD A CACHE IN DIRMATCH WHILE WE'RE AT IT.
-    (and f (file-exists-p f))))
+    (if f
+	(and f (file-exists-p f))
+      (let ((dirmatch (oref this proj-root-dirmatch)))
+	(cond 
+	 ((stringp dirmatch)
+	  nil) ; <- do something here - maybe obsolete the option?
+	 ((ede-project-autoload-dirmatch-p dirmatch)
+	  (if (and dirmatch (ede-dirmatch-installed dirmatch))
+	      (ede-do-dirmatch dirmatch dir)
+	    ;(message "Dirmatch %S not installed." dirmatch)
+	    )))))))
 
 (defmethod ede-auto-load-project ((this ede-project-autoload) dir)
   "Load in the project associated with THIS project autoload description.
