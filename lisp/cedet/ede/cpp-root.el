@@ -168,91 +168,13 @@
 
 ;;; PROJECT CACHE:
 ;;
-;; cpp-root projects are created in a .emacs or other config file, but
-;; there still needs to be a way for a particular file to be
-;; identified against it.  The cache is where we look to map a file
-;; against a project.
-;;
-;; Setting up a simple in-memory cache of active projects allows the
-;; user to re-load their configuration file several times without
-;; messing up the active project set.
+;; cpp-root projects are created in a .emacs or other config file.  We
+;; need to cache them so if the user re-loads a lisp file with the
+;; config in it, we can flush out the old one and replace it.
 ;;
 (defvar ede-cpp-root-project-list nil
   "List of projects created by option `ede-cpp-root-project'.")
 
-(defun ede-cpp-root-file-existing (dir)
-  "Find a cpp-root project in the list of cpp-root projects.
-DIR is the directory to search from."
-  (let ((projs ede-cpp-root-project-list)
-	(ans nil))
-    (while (and projs (not ans))
-      (let ((root (ede-project-root-directory (car projs))))
-	(when (string-match (concat "^" (regexp-quote root)) dir)
-	  (setq ans (car projs))))
-      (setq projs (cdr projs)))
-    ans))
-
-;;; PROJECT AUTOLOAD CONFIG
-;;
-;; Each project type registers itself into the project-class list.
-;; This way, each time a file is loaded, EDE can map that file to a
-;; project.  This project type checks files against the internal cache
-;; of projects created by the user.
-;;
-;; EDE asks two kinds of questions.  One is, does this DIR belong to a
-;; project.  If it does, it then asks, what is the ROOT directory to
-;; the project in DIR.  This is easy for cpp-root projects, but more
-;; complex for multiply nested projects.
-;;
-;; If EDE finds out that a project exists for DIR, it then loads that
-;; project.  The LOAD routine can either create a new project object
-;; (if it needs to load it off disk) or more likely can return an
-;; existing object for the discovered directory.  cpp-root always uses
-;; the second case.
-
-(defun ede-cpp-root-project-file-for-dir (&optional dir)
-  "Return a full file name to the project file stored in DIR."
-  (let ((proj (ede-cpp-root-file-existing dir)))
-    (when proj (oref proj :file))))
-
-(defvar ede-cpp-root-count 0
-  "Count number of hits to the cpp root thing.
-This is a debugging variable to test various optimizations in file
-lookup in the main EDE logic.")
-
-;;;###autoload
-(defun ede-cpp-root-project-root (&optional dir)
-  "Get the root directory for DIR."
-  (let ((projfile (ede-cpp-root-project-file-for-dir
-		   (or dir default-directory))))
-    (setq ede-cpp-root-count (1+ ede-cpp-root-count))
-    ;(debug)
-    (when projfile
-      (file-name-directory projfile))))
-
-(defun ede-cpp-root-load (dir &optional rootproj)
-  "Return a CPP root object if you created one.
-Return nil if there isn't one.
-Argument DIR is the directory it is created for.
-ROOTPROJ is nil, since there is only one project."
-  ;; Snoop through our master list.
-  (ede-cpp-root-file-existing dir))
-
-;;;###autoload
-(ede-add-project-autoload
- (ede-project-autoload "cpp-root"
-		       :name "CPP ROOT"
-		       :file 'ede/cpp-root
-		       :proj-file 'ede-cpp-root-project-file-for-dir
-		       :proj-root 'ede-cpp-root-project-root
-		       :load-type 'ede-cpp-root-load
-		       :class-sym 'ede-cpp-root-project
-		       :new-p nil
-		       :safe-p t)
- ;; When a user creates one of these, it should override any other project
- ;; type that might happen to be in this directory, so force this to the
- ;; very front.
- 'unique)
 
 ;;; CLASSES
 ;;
@@ -466,7 +388,7 @@ This knows details about or source tree."
 
 (defmethod ede-project-root-directory ((this ede-cpp-root-project))
   "Return my root."
-  (file-name-directory (oref this file)))
+  (oref this directory))
 
 ;;; C/CPP SPECIFIC CODE
 ;;
