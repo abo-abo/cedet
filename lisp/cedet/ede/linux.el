@@ -219,7 +219,6 @@ ROOTPROJ is nil, since there is only one project."
 		       :name "LINUX ROOT"
 		       :file 'ede/linux
 		       :proj-file "scripts/ver_linux"
-		       :proj-root-dirmatch "linux[^/]*"
 		       :load-type 'ede-linux-load
 		       :class-sym 'ede-linux-project
 		       :new-p nil
