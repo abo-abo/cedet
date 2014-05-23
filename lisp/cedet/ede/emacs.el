@@ -126,7 +126,6 @@ ROOTPROJ is nil, since there is only one project."
 		       :name "EMACS ROOT"
 		       :file 'ede/emacs
 		       :proj-file "src/emacs.c"
-		       :proj-root-dirmatch "emacs[^/]*"
 		       :load-type 'ede-emacs-load
 		       :class-sym 'ede-emacs-project
 		       :new-p nil
