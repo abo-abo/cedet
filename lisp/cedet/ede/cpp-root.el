@@ -116,11 +116,6 @@
 ;;   <write your code here, or return nil>
 ;;   )
 ;;
-;; (defun MY-ROOT-FCN ()
-;;   "Return the root directory for `default-directory'"
-;;   ;; You might be able to use `ede-cpp-root-project-root'.
-;;   )
-;;
 ;; (defun MY-LOAD (dir)
 ;;   "Load a project of type `cpp-root' for the directory DIR.
 ;; Return nil if there isn't one."
@@ -128,16 +123,14 @@
 ;;                                :locate-fcn 'MYFCN)
 ;;   )
 ;;
-;; (add-to-list 'ede-project-class-files
-;; 	     (ede-project-autoload "cpp-root"
+;; (ede-add-project-autoload
+;;  (ede-project-autoload "cpp-root"
 ;; 	      :name "CPP ROOT"
 ;; 	      :file 'ede/cpp-root
 ;; 	      :proj-file 'MY-FILE-FOR-DIR
-;;            :proj-root 'MY-ROOT-FCN
 ;; 	      :load-type 'MY-LOAD
 ;; 	      :class-sym 'ede-cpp-root-project
-;;	      :safe-p t)
-;; 	     t)
+;;	      :safe-p t))
 ;;
 ;;; TODO
 ;;
