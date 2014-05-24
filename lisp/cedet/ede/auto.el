@@ -47,8 +47,7 @@
 		   :initform nil
 		   :documentation
 		   "An index into the match-data of `configregex'.")
-   (configdatastash :initform nil
-		    :documentation
+   (configdatastash :documentation
 		    "Save discovered match string.")
    )
   "Support complex matches for projects that live in named directories.
@@ -80,8 +79,11 @@ into memory.")
      ;; If the thing to match is stored in a config file.
      ((stringp fc)
       (when (file-exists-p fc)
-	(let ((matchstring (oref dirmatch configdatastash)))
-	  (unless matchstring
+	(let ((matchstring 
+	       (if (slot-boundp dirmatch 'configdatastash)
+		   (oref dirmatch configdatastash)
+		 nil)))
+	  (when (and (not matchstring) (not (slot-boundp dirmatch 'configdatastash)))
 	    (save-current-buffer
 	      (let* ((buff (get-file-buffer fc))
 		     (readbuff
@@ -94,10 +96,11 @@ into memory.")
 		    (setq matchstring
 			  (match-string (or (oref dirmatch configregexidx) 0)))))
 		(if (not buff) (kill-buffer readbuff))))
-	    ;; Convert matchstring to a regexp
-	    (setq matchstring (concat "^" (regexp-quote matchstring)))
-	    ;; Stash it for later.
-	    (oset dirmatch configdatastash matchstring)
+	    (when matchstring
+	      ;; Convert matchstring to a regexp
+	      (setq matchstring (concat "^" (regexp-quote matchstring)))
+	      ;; Stash it for later.
+	      (oset dirmatch configdatastash matchstring))
 	    ;; Debug
 	    ;;(message "Stashing config data for dirmatch %S as %S" (eieio-object-name dirmatch) matchstring)
 	    )
