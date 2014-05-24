@@ -61,17 +61,15 @@ Return nil if there isn't one.
 Argument DIR is the directory it is created for.
 ROOTPROJ is nil, since there is only one project."
   ;; Doesn't already exist, so lets make one.
-  (let* ((ad (ede-android-project-data dir))
-	 (proj (ede-android-project
-		(car ad)
-		:name (car ad)
-		:version (car (cdr ad))
-		:directory (file-name-as-directory dir)
-		:file (expand-file-name "AndroidManifest.xml"
-					dir)
-		:package (car (cdr (cdr ad))))))
-    (ede-add-project-to-global-list proj)
-    ))
+  (let* ((ad (ede-android-project-data dir)))
+    (ede-android-project
+     (car ad)
+     :name (car ad)
+     :version (car (cdr ad))
+     :directory (file-name-as-directory dir)
+     :file (expand-file-name "AndroidManifest.xml"
+			     dir)
+     :package (car (cdr (cdr ad))))))
 
 ;;;###autoload
 (ede-add-project-autoload
