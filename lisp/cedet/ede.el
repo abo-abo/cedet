@@ -1138,8 +1138,9 @@ Optional ROOTRETURN will return the root project for DIR."
 	(setq toppath (car detect))
 	(setq autoloader (cdr detect))
 
-	;; See if it's been loaded before
-	(setq o (ede-directory-get-toplevel-open-project toppath))
+	;; See if it's been loaded before.  Use exact matching since
+	;; know that 'toppath' is the root of the project.
+	(setq o (ede-directory-get-toplevel-open-project toppath 'exact))
 
 	;; If not open yet, load it.
 	(unless o
