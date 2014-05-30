@@ -196,6 +196,11 @@ The class allocated value is replace by different sub classes.")
     (oset this :targets nil))
   )
 
+(defmethod ede-find-subproject-for-directory ((proj ede-generic-project)
+					      dir)
+  "Return PROJ, for handling all subdirs below DIR."
+  proj)
+
 (defmethod ede-generic-get-configuration ((proj ede-generic-project))
   "Return the configuration for the project PROJ."
   (let ((config (oref proj config)))
