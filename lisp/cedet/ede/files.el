@@ -166,8 +166,9 @@ If DIR is the root project, then it is the same."
 
 ;; Force all users to switch to `ede-directory-get-open-project'
 ;; for performance reasons.
-(defun ede-directory-get-toplevel-open-project (dir)
-  "Return an already open toplevel project that is managing DIR."
+(defun ede-directory-get-toplevel-open-project (dir &optional exact)
+  "Return an already open toplevel project that is managing DIR.
+If optional EXACT is non-nil, only return exact matches for DIR."
   (let ((ft (file-name-as-directory (expand-file-name dir)))
 	(all ede-projects)
 	(ans nil))
@@ -180,7 +181,7 @@ If DIR is the root project, then it is the same."
 	 ((string= pd ft)
 	  (setq ans (car all)))
 	 ;; Some sub-directory
-	 ((string-match (concat "^" (regexp-quote pd)) ft)
+	 ((and (not exact) (string-match (concat "^" (regexp-quote pd)) ft))
 	  (setq ans (car all)))
 	 ;; Exact inode match.  Useful with symlinks or complex automounters.
 	 ((let ((pin (ede--project-inode (car all)))
@@ -190,9 +191,10 @@ If DIR is the root project, then it is the same."
 	 ;; Subdir via truename - slower by far, but faster than a traditional lookup.
 	 ;; Note that we must resort to truename in order to resolve issues such as
 	 ;; cross-symlink projects.
-	 ((let ((ftn (file-truename ft))
-		(ptd (file-truename (oref (car all) :directory))))
-	    (string-match (concat "^" (regexp-quote ptd)) ftn))
+	 ((and (not exact)
+	       (let ((ftn (file-truename ft))
+		     (ptd (file-truename (oref (car all) :directory))))
+		 (string-match (concat "^" (regexp-quote ptd)) ftn)))
 	  (setq ans (car all)))
 	 ))
       (setq all (cdr all)))
