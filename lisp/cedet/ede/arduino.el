@@ -153,7 +153,6 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
      :targets nil)))
 
 ;;;###autoload
-;; @TODO - convert to use ede-add-project-autoload
 (ede-add-project-autoload
  (ede-project-autoload
   "arduino"
@@ -162,7 +161,14 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
   :proj-root-dirmatch
   (ede-project-autoload-dirmatch 
    "arduino"
-   :fromconfig ede-arduino-preferences-file
+   ;; NOTE: In loaddefs, the pref file isn't there, so we need a fallback.
+   ;;       when this files loads, we need to use the actual pref in case
+   ;;       the user set it.
+   ;; @TODO - Move this somewhere better / more permanent, use fcn
+   ;;       to change the pref file.
+   :fromconfig (if (boundp 'ede-arduino-preferences-file)
+		   ede-arduino-preferences-file 
+		 "~/.arduino/preferences.txt")
    :configregex "^sketchbook.path=\\([^\n]+\\)$"
    :configregexidx 1)
   :proj-file 'ede-arduino-file
