@@ -522,29 +522,6 @@ Argument DIR is the directory to trim upwards."
 	nil
       fnd)))
 
-;;; @FIXME - The below should now be obsolete now that the detect.el package
-;;           uses the same technique.  Can we obsolete it?
-(defun ede-find-project-root (prj-file-name &optional dir)
-  "Tries to find directory with given project file"
-  (let ((prj-dir (locate-dominating-file (or dir default-directory)
-					 prj-file-name)))
-    (when prj-dir
-      (expand-file-name prj-dir))))
-
-;;; @FIXME - I think `ede-directory-get-toplevel-open-project' does this.
-;;           Can we obsolete it?
-(defun ede-files-find-existing (dir prj-list)
-  "Find a project in the list of projects stored in given variable.
-DIR is the directory to search from."
-  (let ((projs prj-list)
-        (ans nil))
-    (while (and projs (not ans))
-      (let ((root (ede-project-root-directory (car projs))))
-        (when (string-match (concat "^" (regexp-quote root)) dir)
-          (setq ans (car projs))))
-      (setq projs (cdr projs)))
-    ans))
-
 
 (provide 'ede/files)
 
