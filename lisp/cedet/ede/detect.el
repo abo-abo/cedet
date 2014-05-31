@@ -33,6 +33,13 @@
 
 (require 'ede/auto) ;; Autoload settings.
 
+(when (<= emacs-major-version 23)
+  (message "Loading CEDET fallback autoload library.")
+  (require 'cedet/dominate
+	   (expand-file-name "../../../etc/fallback-libraries/dominate.el"
+			     (file-name-directory load-file-name))))
+
+
 ;;; BASIC PROJECT SCAN
 ;;
 (defun ede--detect-stop-scan-p (dir)
