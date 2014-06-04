@@ -166,19 +166,18 @@ Return nil if there isn't one.
 Argument DIR is the directory it is created for.
 ROOTPROJ is nil, since there is only one project."
   ;; Doesn't already exist, so let's make one.
-  (let* ((alobj ede-constructing)
-	 (this nil))
+  (let* ((alobj ede-constructing))
     (when (not alobj) (error "Cannot load generic project without the autoload instance"))
-
-    (setq this
-	  (funcall (oref alobj class-sym)
-		   (symbol-name (oref alobj class-sym))
-		   :name (file-name-nondirectory
-			  (directory-file-name dir))
-		   :version "1.0"
-		   :directory (file-name-as-directory dir)
-		   :file (expand-file-name (oref alobj :proj-file)) ))
-    (ede-add-project-to-global-list this)
+    ;;;
+    ;; TODO - find the root dir. 
+    (let ((rootdir dir))
+      (funcall (oref alobj class-sym)
+	       (symbol-name (oref alobj class-sym))
+	       :name (file-name-nondirectory (directory-file-name dir))
+	       :version "1.0"
+	       :directory (file-name-as-directory rootdir)
+	       :file (expand-file-name (oref alobj :proj-file)
+				       rootdir)))
     ))
 
 ;;; Base Classes for the system
@@ -409,6 +408,12 @@ Argument COMMAND is the command to use for compiling the target."
 	 (run (concat "./" (oref config :run-command)))
 	 (cmd (read-from-minibuffer "Run (like this): " run)))
     (ede-shell-run-something target cmd)))
+
+(defmethod project-rescan ((this ede-generic-project))
+  "Rescan this generic project from the sources."
+  ;; Force the config to be rescanned.
+  (oset this config nil)
+  (ede-generic-get-configuration this))
 
 ;;; Customization
 ;;
