@@ -110,15 +110,14 @@ Return nil if there isn't one.
 Argument DIR is the directory it is created for.
 ROOTPROJ is nil, since there is only one project."
   ;; Doesn't already exist, so let's make one.
-  (let* ((vertuple (ede-emacs-version dir))
-	 (proj (ede-emacs-project
-		(car vertuple)
-		:name (car vertuple)
-		:version (cdr vertuple)
-		:directory (file-name-as-directory dir)
-		:file (expand-file-name "src/emacs.c"
-					dir))))
-    (ede-add-project-to-global-list proj)))
+  (let* ((vertuple (ede-emacs-version dir)))
+    (ede-emacs-project
+     (car vertuple)
+     :name (car vertuple)
+     :version (cdr vertuple)
+     :directory (file-name-as-directory dir)
+     :file (expand-file-name "src/emacs.c"
+			     dir))))
 
 ;;;###autoload
 (ede-add-project-autoload
@@ -277,6 +276,15 @@ Knows about how the Emacs source tree is organized."
 	 )
     (if (not dirs) (call-next-method)
       (ede-emacs-find-in-directories name dir dirs))
+    ))
+
+;;; Command Support
+;;
+(defmethod project-rescan ((this ede-emacs-project))
+  "Rescan this Emacs project from the sources."
+  (let ((ver (ede-emacs-version (ede-project-root-directory this))))
+    (oset this name (car ver))
+    (oset this version (cdr ver))
     ))
 
 (provide 'ede/emacs)
