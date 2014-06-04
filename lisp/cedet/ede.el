@@ -689,6 +689,7 @@ Otherwise, create a new project for DIR."
   (if (ede-check-project-directory dir)
       (progn
 	;; Load the project in DIR, or make one.
+	;; @TODO - IS THIS REAL?
 	(ede-load-project-file dir)
 
 	;; Check if we loaded anything on the previous line.
@@ -836,17 +837,17 @@ ARGS are additional arguments to pass to method SYM."
 (defun ede-rescan-toplevel ()
   "Rescan all project files."
   (interactive)
-  (if (not (ede-directory-get-open-project default-directory))
-      ;; This directory isn't open.  Can't rescan.
-      (error "Attempt to rescan a project that isn't open")
+  (when (not (ede-toplevel))
+    ;; This directory isn't open.  Can't rescan.
+    (error "Attempt to rescan a project that isn't open"))
 
-    ;; Continue
-    (let ((toppath (ede-toplevel-project default-directory))
-	  (ede-deep-rescan t))
+  ;; Continue
+  (let ((root (ede-toplevel))
+	(ede-deep-rescan t))
 
-      (project-rescan (ede-load-project-file toppath))
-      (ede-reset-all-buffers)
-      )))
+    (project-rescan root)
+    (ede-reset-all-buffers)
+    ))
 
 (defun ede-new-target (&rest args)
   "Create a new target specific to this type of project file.
@@ -1144,6 +1145,10 @@ Optional ROOTRETURN will return the root project for DIR."
 
 	;; If not open yet, load it.
 	(unless o
+	  ;; NOTE: We set ede-constructing to the autoloader we are using.
+	  ;;       Some project types have one class, but many autoloaders
+	  ;;       and this is how we tell the instantiation which kind of
+	  ;;       project to make.
 	  (let ((ede-constructing autoloader))
 
 	    ;; This is the only place `ede-auto-load-project' should be called.
@@ -1158,7 +1163,8 @@ Optional ROOTRETURN will return the root project for DIR."
 	;; for from DIR in the sub-list.
 	(ede-find-subproject-for-directory o path)
 
-	))))
+	;; Return the project.
+	o))))
 
 ;;; PROJECT ASSOCIATIONS
 ;;
