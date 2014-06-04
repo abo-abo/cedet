@@ -158,6 +158,7 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
   "arduino"
   :name "ARDUINO SKETCH"
   :file 'ede/arduino
+  :root-only nil
   :proj-root-dirmatch
   (ede-project-autoload-dirmatch 
    "arduino"
@@ -218,6 +219,10 @@ Argument COMMAND is the command to use for compiling the target."
 (defmethod project-debug-target ((target ede-arduino-target))
   "Run the current project derived from TARGET in a debugger."
   (error "No Debugger support for Arduino."))
+
+(defmethod project-rescan ((this ede-arduino-project))
+  "Rescan all project files associated with THIS project."
+  (ede-arduino-sync))
 
 ;;; C/C++ support
 (require 'semantic/db)
