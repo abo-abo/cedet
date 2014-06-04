@@ -71,11 +71,6 @@
   :group 'project-linux
   :type 'string)
 
-;; @TODO - GET RID OF THIS
-(defun ede-linux-project-root (&optional dir)
-  "Get the root directory for DIR."
-  nil)
-
 (defun ede-linux-version (dir)
   "Find the Linux version for the Linux src in DIR."
   (let ((buff (get-buffer-create " *linux-query*")))
