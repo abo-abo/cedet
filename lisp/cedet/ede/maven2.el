@@ -146,9 +146,6 @@ ROOTPROJ is nil, since there is only one project."
 			     :file (expand-file-name ede-maven2-project-file-name dir)
 			     :current-target "package"
 			     )))
-    (ede-add-project-to-global-list this)
-    ;; TODO: the above seems to be done somewhere else, maybe ede-load-project-file
-    ;; this seems to lead to multiple copies of project objects in ede-projects
     ;; TODO: call rescan project to setup all data
     this))
 
