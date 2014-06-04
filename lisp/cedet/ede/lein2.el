@@ -51,14 +51,11 @@ Return nil if there isn't one.
 Argument DIR is the directory it is created for.
 ROOTPROJ is nil, since there is only one project."
   ;; Doesn't already exist, so lets make one.
-  (let ((this
-	 (ede-lein2-project "Leiningen2"
-			    :name "Leiningen dir" ; make fancy name from dir here.
-			    :directory dir
-			    :file (expand-file-name ede-lein2-project-file-name dir)
-			    :current-target "jar")))
-    (ede-add-project-to-global-list this)
-    this))
+  (ede-lein2-project "Leiningen2"
+		     :name "Leiningen dir" ; make fancy name from dir here.
+		     :directory dir
+		     :file (expand-file-name ede-lein2-project-file-name dir)
+		     :current-target "jar"))
 
 ;;;###autoload
 (defclass ede-lein2-project (ede-jvm-base-project)
