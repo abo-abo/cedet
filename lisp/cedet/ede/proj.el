@@ -690,7 +690,10 @@ Optional argument FORCE will force items to be regenerated."
   "Rescan the EDE proj project THIS."
   (let ((root (or (ede-project-root this) this))
 	)
-    (setq ede-projects (delq root ede-projects))
+    ;; @TODO - VERIFY THE BELOW WORKS
+    (ede-project-directory-remove-hash
+     (file-name-directory (ede-project-root-directory root)))
+    (ede-delete-project-from-global-list root)
     ;; NOTE : parent function double-checks that this dir was
     ;; already in memory once.
     (ede-load-project-file (ede-project-root-directory root))
