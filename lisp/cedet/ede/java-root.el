@@ -220,11 +220,13 @@ Each directory needs a project file to control it.")
     (oset this :file f)
     (oset this :directory (file-name-directory f))
     (ede-project-directory-remove-hash (file-name-directory f))
+    ;; NOTE: We must add to global list here because these classes are not
+    ;;       created via the typial loader, but instead via calls from a .emacs
+    ;;       file.
     (ede-add-project-to-global-list this)
+
     (unless (slot-boundp this 'targets)
       (oset this :targets nil))
-    ;; We need to add ourselves to the master list.
-    ;;(setq ede-projects (cons this ede-projects))
     ))
 
 ;;; SUBPROJ Management.
@@ -304,6 +306,12 @@ This knows details about or source tree."
 (defmethod ede-project-root-directory ((this ede-java-root-project))
   "Return my root."
   (file-name-directory (oref this :file)))
+
+;;; Rescan command.
+;;
+(defmethod project-rescan ((this ede-java-root-project))
+  "Don't rescan this project from the sources."
+  (message "java-root has nothing to rescan."))
 
 ;;; JAVA SPECIFIC CODE
 ;;
