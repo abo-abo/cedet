@@ -47,6 +47,12 @@
 		   :initform nil
 		   :documentation
 		   "An index into the match-data of `configregex'.")
+   (subdir-only :initarg :subdir-only
+		:initform t
+		:documentation
+		"Non-nil means an exact match to the found directory is a non-match.
+This implies projects exist only in subdirectories of the configuration path.
+If `:subdir-only' is nil, then the directory from the configuration file is the project.")
    (configdatastash :documentation
 		    "Save discovered match string.")
    )
@@ -97,6 +103,10 @@ into memory.")
 			  (match-string (or (oref dirmatch configregexidx) 0)))))
 		(if (not buff) (kill-buffer readbuff))))
 	    (when matchstring
+	      ;; If this dirmatch only finds subdirs of matchstring, then
+	      ;; force matchstring to be a directory.
+	      (when (oref dirmatch subdir-only)
+		(setq matchstring (file-name-as-directory matchstring)))
 	      ;; Convert matchstring to a regexp
 	      (setq matchstring (concat "^" (regexp-quote matchstring)))
 	      ;; Stash it for later.
@@ -104,10 +114,15 @@ into memory.")
 	    ;; Debug
 	    ;;(message "Stashing config data for dirmatch %S as %S" (eieio-object-name dirmatch) matchstring)
 	    )
+	  ;;(message "dirmatch %s against %s" matchstring (expand-file-name file))
 	  ;; Match against our discovered string
-	  (and matchstring (string-match matchstring
-					 (expand-file-name file))))))
-
+	  (setq file (file-name-as-directory (expand-file-name file)))
+	  (and matchstring (string-match matchstring (expand-file-name file))
+	       (or (not (oref dirmatch subdir-only))
+		   (not (= (match-end 0) (length file))))
+	       )
+	  )))
+     
      ;; Add new matches here
      ;; ((stringp somenewslot ...)
      ;;   )
@@ -137,7 +152,11 @@ into memory.")
 		       :documentation
 		       "To avoid loading a project, check if the directory matches this.
 Specifying this matcher object will  allow EDE to perform a complex
-check without loading the project.") 
+check without loading the project.
+
+NOTE: If you use dirmatch, you may need to set :root-only to `nil'.
+While it may be a root based project, all subdirs will happen to return
+true for the dirmatch, so for scanning purposes, set it to `nil'.") 
    (proj-root :initarg :proj-root
 	      :type function
 	      :documentation "A function symbol to call for the project root.
