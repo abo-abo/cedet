@@ -171,7 +171,8 @@ If DIR is the root project, then it is the same."
 If optional EXACT is non-nil, only return exact matches for DIR."
   (let ((ft (file-name-as-directory (expand-file-name dir)))
 	(all ede-projects)
-	(ans nil))
+	(ans nil)
+	(shortans nil))
     (while (and all (not ans))
       ;; Do the check.
       (let ((pd (oref (car all) :directory))
@@ -182,7 +183,14 @@ If optional EXACT is non-nil, only return exact matches for DIR."
 	  (setq ans (car all)))
 	 ;; Some sub-directory
 	 ((and (not exact) (string-match (concat "^" (regexp-quote pd)) ft))
-	  (setq ans (car all)))
+	  (if (not shortans)
+	      (setq shortans (car all))
+	    ;; We already have a short answer, so see if pd (the match we found)
+	    ;; is longer.  If it is longer, then it is more precise.
+	    (when (< (length (oref shortans :directory))
+		     (length pd))
+	      (setq shortans (car all))))
+	  )
 	 ;; Exact inode match.  Useful with symlinks or complex automounters.
 	 ((let ((pin (ede--project-inode (car all)))
 		(inode (ede--inode-for-dir dir)))
@@ -195,10 +203,18 @@ If optional EXACT is non-nil, only return exact matches for DIR."
 	       (let ((ftn (file-truename ft))
 		     (ptd (file-truename (oref (car all) :directory))))
 		 (string-match (concat "^" (regexp-quote ptd)) ftn)))
-	  (setq ans (car all)))
-	 ))
+	  (if (not shortans)
+	      (setq shortans (car all))
+	    ;; We already have a short answer, so see if pd (the match we found)
+	    ;; is longer.  If it is longer, then it is more precise.
+	    (when (< (length (oref shortans :directory))
+		     (length pd))
+	      (setq shortans (car all))))
+	  )))
       (setq all (cdr all)))
-    ans))
+    ;; If we have an exact answer, use that, otherwise use
+    ;; the short answer we found -> ie - we are in a subproject.
+    (or ans shortans)))
 
 (defmethod ede-find-subproject-for-directory ((proj ede-project-placeholder)
 					      dir)
