@@ -151,16 +151,16 @@ If DIR is the root project, then it is the same."
 	 (proj (ede--inode-get-toplevel-open-project inode))
 	 (ans nil))
     ;; Try file based search.
-    ;; @FIXME - Can we dump this section?
-    (when (not proj)
+    (when (or ede--disable-inode (not proj))
       (setq proj (ede-directory-get-toplevel-open-project ft)))
     ;; Default answer is this project
     (setq ans proj)
     ;; Save.
     (when rootreturn (set rootreturn proj))
     ;; Find subprojects.
-    (when (and proj (or ede--disable-inode
-			(not (equal inode (ede--project-inode proj)))))
+    (when (and proj (if ede--disable-inode
+			(not (string= ft (expand-file-name (oref proj :directory))))
+		      (not (equal inode (ede--project-inode proj)))))
       (setq ans (ede-find-subproject-for-directory proj ft)))
     ans))
 
@@ -175,7 +175,7 @@ If optional EXACT is non-nil, only return exact matches for DIR."
 	(shortans nil))
     (while (and all (not ans))
       ;; Do the check.
-      (let ((pd (oref (car all) :directory))
+      (let ((pd (expand-file-name (oref (car all) :directory)))
 	    )
 	(cond
 	 ;; Exact text match.
@@ -192,22 +192,23 @@ If optional EXACT is non-nil, only return exact matches for DIR."
 	      (setq shortans (car all))))
 	  )
 	 ;; Exact inode match.  Useful with symlinks or complex automounters.
-	 ((let ((pin (ede--project-inode (car all)))
-		(inode (ede--inode-for-dir dir)))
-	    (and (not (eql pin 0)) (equal pin inode)))
-	  (setq ans (car all)))
+	 ((and (not ede--disable-inode)
+	       (let ((pin (ede--project-inode (car all)))
+		     (inode (ede--inode-for-dir dir)))
+		 (and (not (eql pin 0)) (equal pin inode))))
+	  (setq ans (car all))) 
 	 ;; Subdir via truename - slower by far, but faster than a traditional lookup.
 	 ;; Note that we must resort to truename in order to resolve issues such as
 	 ;; cross-symlink projects.
 	 ((and (not exact)
 	       (let ((ftn (file-truename ft))
-		     (ptd (file-truename (oref (car all) :directory))))
+		     (ptd (file-truename pd)))
 		 (string-match (concat "^" (regexp-quote ptd)) ftn)))
 	  (if (not shortans)
 	      (setq shortans (car all))
 	    ;; We already have a short answer, so see if pd (the match we found)
 	    ;; is longer.  If it is longer, then it is more precise.
-	    (when (< (length (oref shortans :directory))
+	    (when (< (length (expand-file-name (oref shortans :directory)))
 		     (length pd))
 	      (setq shortans (car all))))
 	  )))
@@ -220,13 +221,14 @@ If optional EXACT is non-nil, only return exact matches for DIR."
 					      dir)
   "Find a subproject of PROJ that corresponds to DIR."
   (if ede--disable-inode
-      (let ((ans nil))
+      (let ((ans nil)
+	    (fulldir (file-truename dir)))
 	;; Try to find the right project w/out inodes.
 	(ede-map-subprojects
 	 proj
 	 (lambda (SP)
 	   (when (not ans)
-	     (if (string= (file-truename dir) (oref SP :directory))
+	     (if (string= fulldir (file-truename (oref SP :directory)))
 		 (setq ans SP)
 	       (ede-find-subproject-for-directory SP dir)))))
 	ans)
