@@ -83,6 +83,43 @@ Return a cons cell:
     (when root
       (cons root ede--detect-found-project))))
 
+;;; Root Only project detect
+;;
+;; For projects that only have a detectible ROOT file, but may in fact
+;; contain a generic file such as a Makefile, we need to do a second scan
+;; to make sure we don't miss-match.
+(defun ede--detect-ldf-rootonly-predicate (dir)
+  "Non-nil if DIR contain any known EDE project types."
+  (if (ede--detect-stop-scan-p dir)
+      (throw 'stopscan nil)
+    (let ((types ede-project-class-files))
+      ;; Loop over all types, loading in the first type that we find.
+      (while (and types (not ede--detect-found-project))
+	(if (and
+	     (oref (car types) root-only)
+	     (ede-auto-detect-in-dir (car types) dir))
+	    (progn
+	      ;; We found one!
+	      (setq ede--detect-found-project (car types)))
+	  (setq types (cdr types)))
+	)
+      ede--detect-found-project)))
+
+(defun ede--detect-scan-directory-for-rootonly-project (directory)
+  "Detect an EDE project for the current DIRECTORY by scanning.
+This function ALWAYS scans files and directories and DOES NOT
+use any file caches.
+Return a cons cell:
+  ( ROOTDIR . PROJECT-AUTOLOAD)"
+  (let* ((ede--detect-found-project nil)
+	 (root 
+	  (catch 'stopscan
+	    (locate-dominating-file directory
+				    'ede--detect-ldf-rootonly-predicate))))
+    (when root
+      (cons root ede--detect-found-project))))
+
+
 ;;; NESTED PROJECT SCAN
 ;;
 ;; For projects that can have their dominating file exist in all their
@@ -124,10 +161,27 @@ Return a cons cell:
   (let* ((scan (ede--detect-scan-directory-for-project directory))
 	 (root (car scan))
 	 (auto (cdr scan)))
-    (if (and scan (oref auto root-only))
-	scan
-      (when scan
-	(cons (ede--detect-scan-directory-for-project-root root auto) auto)))))
+    (when scan
+      ;; If what we found is already a root-only project, return it.
+      (if (oref auto root-only)
+	  scan
+
+	;; If what we found is a generic project, check to make sure we aren't
+	;; in some other kind of root project.
+	(if (oref auto generic-p)
+	    (let ((moreroot (ede--detect-scan-directory-for-rootonly-project root)))
+	      ;; If we found a rootier project, return that.
+	      (if moreroot
+		  moreroot
+
+		;; If we didn't find a root from the generic project, then 
+		;; we need to rescan upward.
+		(cons (ede--detect-scan-directory-for-project-root root auto) auto)))
+
+	  ;; Non-generic non-root projects also need to rescan upward.
+	  (cons (ede--detect-scan-directory-for-project-root root auto) auto)))
+
+	  )))
 
 ;;; TEST
 ;;
