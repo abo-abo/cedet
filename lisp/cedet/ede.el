@@ -507,7 +507,7 @@ Sets buffer local variables for EDE."
     (when (not proj)
       ;; If there is no open project, look up the project
       ;; autoloader to see if we should initialize.
-      (let ((projdetect (ede-detect-directory-for-project default-directory)))
+      (let ((projdetect (ede-directory-project-cons default-directory)))
 
 	(when projdetect
 	  ;; No project was loaded, but we have a project description
@@ -523,7 +523,7 @@ Sets buffer local variables for EDE."
 		      (ede-directory-safe-p top)))
 
 	    ;; The project is safe, so load it in.
-	    (setq proj (ede-load-project-file default-directory 'ROOT))))))
+	    (setq proj (ede-load-project-file default-directory projdetect 'ROOT))))))
 
     ;; If PROJ is now loaded in, we can initialize our buffer to it.
     (when proj
@@ -1114,8 +1114,10 @@ Flush the dead projects from the project cache."
 	  (push (ede--project-inode P) scanned))))
     (message "EDE by directory %sis still sane." (if ede--disable-inode "" "& inode "))))
 
-(defun ede-load-project-file (dir &optional rootreturn)
+(defun ede-load-project-file (dir &optional detectin rootreturn)
   "Project file independent way to read a project in from DIR.
+Optional DETECTIN is an autoload cons from `ede-detect-directory-for-project'
+which can be passed in to save time.
 Optional ROOTRETURN will return the root project for DIR."
   ;; Don't do anything if we are in the process of
   ;; constructing an EDE object.
@@ -1130,7 +1132,7 @@ Optional ROOTRETURN will return the root project for DIR."
     ;;(message "EDE LOAD : %S" file)
     (let* ((file dir)
 	   (path (file-name-as-directory (expand-file-name dir)))
-	   (detect (ede-directory-project-cons path))
+	   (detect (or detectin (ede-directory-project-cons path)))
 	   (autoloader nil)
 	   (toppath nil)
 	   (o nil))
