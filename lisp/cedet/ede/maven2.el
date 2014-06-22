@@ -130,7 +130,13 @@
   :type 'list)
 
 (defconst ede-maven2-project-file-name "pom.xml"
-  "name of project file for Maven2 projects")
+  "Name of project file for Maven2 projects")
+
+(defcustom ede-maven2-deps-plugin-options '("-DincludeTypes=jar")
+  "Options for Maven's dependency plugin that is used to extract the classpath for project"
+  :group 'ede-maven2
+  :require  'ede/maven2
+  :type 'list)
 
 ;;;###autoload
 (defun ede-maven2-load (dir &optional rootproj)
@@ -191,8 +197,9 @@ Argument COMMAND is the command to use when compiling."
   "Get classpath for maven project"
   (ede-jvm-get-classpath-from-command proj ede-maven2-execute-mvn-to-get-classpath
 				      maven2-outfile-name ede-maven2-maven-command
-				      `(,nil ,nil ,nil "--batch-mode" "dependency:build-classpath"
-					     ,(concat "-Dmdep.outputFile=" maven2-outfile-name))))
+				      (append `(,nil ,nil ,nil "--batch-mode" "dependency:build-classpath"
+						     ,(concat "-Dmdep.outputFile=" maven2-outfile-name))
+					      ede-maven2-deps-plugin-options)))
 
 ;; TODO: really should be based on content of pom.xml file. But we need parser for it...
 ;; TODO: add caching...
