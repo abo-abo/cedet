@@ -109,8 +109,8 @@
 		  :documentation
 		  "Command used for debugging this project.")
    (run-command :initarg :run-command
-		:initform nil
-		:type (or null string)
+		:initform ""
+		:type string
 		:group commands
 		:custom string
 		:group (default build)
@@ -500,6 +500,8 @@ the class `ede-generic-project' project."
 			      "CVS" 'ede-generic-vc-project)
 
   ;; Take advantage of existing 'projectile' based projects.
+  ;; @TODO - if projectile supports compile commands etc, can we
+  ;; read that out?  Howto if projectile is not part of core emacs.
   (ede-generic-new-autoloader "generic-projectile" ".projectile"
 			      ".projectile" 'ede-generic-vc-project)
 
