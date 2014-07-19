@@ -29,6 +29,7 @@
 %start start
 %start compilation_units
 %start compilation_unit
+%start namespace_declaration
 %start include_declaration
 %start require_expr
 %start type_declaration
@@ -130,6 +131,10 @@
 %token <punctuation> T_ASTERISK        	    "@"
 %token <punctuation> T_DOLLER               "$"
 
+;; TODO integrate it to punctuation ?
+%type  <namespace-sep> syntax "\\s\\" matchdatatype string
+%token <namespace-sep> T_NAMESPACE_SEP    "\\"
+
 ;; -----------------
 ;; Literal terminals
 ;; -----------------
@@ -212,6 +217,9 @@
 "continue [<label>] ;"
 %keyword T_ECHO            "echo"
 %keyword T_PRINT           "print"
+%keyword T_NAMESPACE       "namespace"
+%put     T_NAMESPACE summary
+"Namespace declaration: namespace <name>"
 %keyword T_CLASS           "class"
 %put     T_CLASS summary
 "Class declaration: class <name>"
@@ -374,6 +382,7 @@ compilation_units
 compilation_unit
   : include_declaration
   | type_declaration
+  | namespace_declaration
   ;
 
 include_declaration
@@ -387,6 +396,13 @@ include_declaration
     (identity $2)
   | T_INCLUDE_ONCE require_expr T_SEMI
     (identity $2)
+  ;
+
+namespace_declaration
+  : T_NAMESPACE namespaced_identifier T_SEMI
+    (EXPANDTAG
+     (PACKAGE-TAG $2 nil)
+     )
   ;
 
 require_expr
@@ -576,6 +592,14 @@ term
   | T_NEW
   | T_CLONE
   | T_ARRAY
+  ;
+
+namespaced_identifier
+  : T_NAMESPACE_SEP namespaced_identifier
+    (concat "\\" $2)
+  | IDENTIFIER T_NAMESPACE_SEP namespaced_identifier
+    (concat $1 "\\" $3)
+  | IDENTIFIER
   ;
 
 literal
@@ -843,6 +867,7 @@ It ignores whitespaces, newlines and comments."
   wisent-php-wy--<keyword>-keyword-analyzer
   wisent-php-wy--<symbol>-regexp-analyzer
   wisent-php-wy--<punctuation>-string-analyzer
+  wisent-php-wy--<namespace-sep>-string-analyzer
   wisent-php-wy--<block>-block-analyzer
   ;;;;
   semantic-lex-default-action)
