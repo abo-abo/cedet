@@ -427,7 +427,7 @@ class_declaration
 
 superc_opt
   : ;;EMPTY
-  | T_EXTENDS IDENTIFIER
+  | T_EXTENDS namespaced_identifier
     (identity $2)
   ;
 
@@ -502,9 +502,9 @@ method_declarator
   ;
 
 identifier_list
-  : identifier_list T_COMMA IDENTIFIER
+  : identifier_list T_COMMA namespaced_identifier
     (cons $3 $1)
-  | IDENTIFIER
+  | namespaced_identifier
     (list $1)
   ;
 
@@ -586,6 +586,7 @@ term
   : literal
   | operator
   | IDENTIFIER
+  | namespaced_identifier
   | BRACK_BLOCK
   | PAREN_BLOCK
   | BRACE_BLOCK
