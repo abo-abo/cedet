@@ -31,6 +31,7 @@
 %start compilation_unit
 %start include_declaration
 %start require_expr
+%start use_statement
 %start type_declaration
 %start class_declaration
 %start class_body
@@ -244,6 +245,8 @@
 %keyword T_REQUIRE         "require"
 %keyword T_REQUIRE_ONCE    "require_once"
 %keyword T_USE             "use"
+%put     T_USE summary
+"Alias definition: use <imported> {as <name>}"
 %keyword T_GLOBAL          "global"
 %keyword T_ISSET           "isset"
 %keyword T_EMPTY           "empty"
@@ -388,9 +391,7 @@ compilation_unit
   ;
 
 include_declaration
-  : T_USE require_expr T_SEMI
-    (identity $2)
-  | T_REQUIRE require_expr T_SEMI
+  : T_REQUIRE require_expr T_SEMI
     (identity $2)
   | T_REQUIRE_ONCE require_expr T_SEMI
     (identity $2)
@@ -412,6 +413,7 @@ type_declaration
   | class_declaration
   | interface_declaration
   | namespace_declaration
+  | use_statement
   ;
 
 ;;; Type Declaration token
@@ -459,6 +461,13 @@ namespace_declaration
 namespace_body
   : BRACE_BLOCK
     (EXPANDFULL $1 compilation_unit)
+  ;
+
+use_statement
+  : T_USE namespaced_identifier T_AS IDENTIFIER T_SEMI
+    (ALIAS-TAG $4 "alias" $2)
+  | T_USE namespaced_identifier T_SEMI
+    (ALIAS-TAG (car (last (split-string $2 "\\\\"))) "alias" $2)
   ;
 
 ;;; Type Declaration token
