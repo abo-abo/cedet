@@ -80,7 +80,7 @@
 ;; ------------------
 ;; Operator terminals
 ;; ------------------
-%type  <punctuation> ;;syntax "\\(\\s.\\|\\s$\\|\\s'\\)+" matchdatatype string
+%type  <punctuation> syntax "\\(\\s.\\|\\s'\\)+" matchdatatype string
 
 %token <punctuation> T_DEREF                "->"
 %token <punctuation> T_PAAMAYIM_NEKUDOTAYIM "::"
@@ -131,7 +131,6 @@
 %token <punctuation> T_OR          	    "|"
 %token <punctuation> T_COMP        	    "~"
 %token <punctuation> T_ASTERISK        	    "@"
-%token <punctuation> T_DOLLER               "$"
 
 ;; TODO integrate it to punctuation ?
 %type  <namespace-sep> syntax "\\s\\" matchdatatype string
@@ -140,8 +139,11 @@
 ;; -----------------
 ;; Literal terminals
 ;; -----------------
-%type  <symbol>      ;;syntax "\\(\\sw\\|\\s_\\)+"
+%type  <symbol>      syntax "[a-zA-Z_]\\(\\sw\\|\\s_\\)*"
 %token <symbol>      IDENTIFIER
+
+%type  <variable>    syntax "\\$\\(\\sw\\|\\s_\\)+"
+%token <variable>    T_VARIABLE
 
 %type  <string>      ;;syntax "\\s\"" matchdatatype sexp
 %token <string>      STRING_LITERAL
@@ -550,10 +552,16 @@ formal_parameters
 ;;; Variable token
 ;; ("NAME" variable "TYPE" DEFAULT-VALUE EXTRA-SPEC "DOCSTRING")
 formal_parameter
-  : variable_declarator_id T_EQ expression
-    (VARIABLE-TAG $1 nil $region3)
-  | variable_declarator_id
-    (VARIABLE-TAG $1 nil nil)
+  : type_opt T_VARIABLE T_EQ expression
+    (VARIABLE-TAG $2 $1 $region4)
+  | type_opt T_VARIABLE
+    (VARIABLE-TAG $2 $1 nil)
+  ;
+
+type_opt
+  : ;; EMPTY
+  | T_ARRAY
+  | namespaced_identifier
   ;
 
 ;;; Variable token
@@ -578,7 +586,7 @@ variable_declarator
   ;
 
 variable_declarator_id
-  : reference_opt IDENTIFIER dims_opt
+  : reference_opt T_VARIABLE dims_opt
     (concat $2 $3)
   ;
 
@@ -602,6 +610,7 @@ term
   | operator
   | IDENTIFIER
   | namespaced_identifier
+  | T_VARIABLE
   | BRACK_BLOCK
   | PAREN_BLOCK
   | BRACE_BLOCK
@@ -881,6 +890,7 @@ It ignores whitespaces, newlines and comments."
   wisent-php-wy--<string>-sexp-analyzer
   ;; Must detect keywords before other symbols
   wisent-php-wy--<keyword>-keyword-analyzer
+  wisent-php-wy--<variable>-regexp-analyzer
   wisent-php-wy--<symbol>-regexp-analyzer
   wisent-php-wy--<punctuation>-string-analyzer
   wisent-php-wy--<namespace-sep>-string-analyzer
