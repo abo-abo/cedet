@@ -50,9 +50,8 @@
 %start formal_parameters
 %start formal_parameter
 %start field_declaration
-%start variable_declarators
 %start variable_declarator
-%start variable_declarator_id
+%start constant_declaration
 %start variable_initializer
 %start class_modifiers
 %start class_modifier
@@ -167,7 +166,7 @@
 %keyword T_FUNCTION        "function"
 %keyword T_CONST           "const"
 %put     T_CONST summary
-"Unused reserved word"
+"const <var> [= <expr>]"
 %keyword T_RETURN          "return"
 %put     T_RETURN summary
 "return [<expr>] ;"
@@ -453,6 +452,7 @@ class_member_declaration
   | class_declaration
   | method_declaration
   | field_declaration
+  | constant_declaration
   ;
 
 namespace_declaration
@@ -567,27 +567,20 @@ type_opt
 ;;; Variable token
 ;; ("NAME" variable "TYPE" DEFAULT-VALUE EXTRA-SPEC "DOCSTRING")
 field_declaration
-  : field_modifiers_opt variable_declarators T_SEMI
-    (VARIABLE-TAG $2 nil nil :typemodifiers $1)
-  ;
-
-variable_declarators
-  : variable_declarators T_COMMA variable_declarator
-    (cons $3 $1)
-  | variable_declarator
-    (list $1)
+  : field_modifiers_opt variable_declarator T_SEMI
+    (VARIABLE-TAG (car $2) nil (cdr $2) :typemodifiers $1)
   ;
 
 variable_declarator
-  : variable_declarator_id T_EQ variable_initializer
-    (list $1 nil nil $3)
-  | variable_declarator_id
-    (list $1)
+  : T_VARIABLE T_EQ variable_initializer
+    (cons $1 $3)
+  | T_VARIABLE
+    (cons $1 nil)
   ;
 
-variable_declarator_id
-  : reference_opt T_VARIABLE dims_opt
-    (concat $2 $3)
+constant_declaration
+  : T_CONST IDENTIFIER T_EQ variable_initializer T_SEMI
+    (VARIABLE-TAG $2 nil $region3 :typemodifiers $1)
   ;
 
 reference_opt
