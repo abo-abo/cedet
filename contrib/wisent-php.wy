@@ -24,6 +24,11 @@
 
 ;;%package wisent-php-wy
 
+%{
+(declare-function wisent-php-create-merge-alias "wisent-php")
+(declare-function wisent-php-merge-alias "wisent-php")
+}
+
 %languagemode  php-mode
 
 %start start
@@ -472,15 +477,9 @@ use_statement
 
 use_declarations
   : use_declaration T_COMMA use_declarations
-    (ALIAS-TAG
-     (cons (cons (semantic-tag-name $1) $region1) (semantic-tag-name $3))
-     "alias"
-     (cons (semantic-tag-alias-definition $1) (semantic-tag-alias-definition $3)))
+     (wisent-php-merge-alias $1 $region1 $3)
   | use_declaration
-    (ALIAS-TAG
-     (list (cons (semantic-tag-name $1) $region1))
-     "alias"
-     (list (semantic-tag-alias-definition $1)))
+    (wisent-php-create-merge-alias $1 $region1)
   ;
 
 use_declaration

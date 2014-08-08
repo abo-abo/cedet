@@ -116,6 +116,21 @@ Use the alternate LALR(1) parser."
   ;; Setup phpdoc stuff
   ;;(semantic-php-doc-setup))
 
+(defun wisent-php-create-merge-alias (tag region)
+  "Transform alias TAG into a tag that can be expanded.
+
+REGION is a cons START . END delimiting the definition region of the tag."
+  (semantic-tag-new-alias (cons (semantic-tag-name tag) region)
+                          "alias"
+                          (list (semantic-tag-alias-definition tag))))
+
+(defun wisent-php-merge-alias (tag region merge-tag)
+  "Merge alias TAG with its REGION into the expandable tag MERGE-TAG."
+  (semantic-tag-new-alias (cons (cons (semantic-tag-name tag) region)
+                                (semantic-tag-name merge-tag))
+                          "alias"
+                          (cons (semantic-tag-alias-definition tag)
+                                (semantic-tag-alias-definition merge-tag))))
 
 (defun wisent-php-expand-tag-variable (tag)
   "Expand variable TAG into a list of equivalents variable tags.
