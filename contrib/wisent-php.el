@@ -117,17 +117,16 @@ Use the alternate LALR(1) parser."
   ;;(semantic-php-doc-setup))
 
 
-(defun wisent-php-expand-tag (tag)
-  "Expand TAG into a list of equivalent tags, or nil.
+(defun wisent-php-expand-tag-variable (tag)
+  "Expand variable TAG into a list of equivalents variable tags.
 Expand multiple variable declarations in the same statement, that is
 tags of class `variable' whose name is equal to a list of elements of
 the form (NAME START . END).  NAME is a variable name.  START and END
 are the bounds in the declaration, related to this variable NAME."
-  (let (elts elt clone start end xpand)
-    (cond
-     ((and (eq 'variable (semantic-tag-class tag))
-           (consp (setq elts (semantic-tag-name tag))))
-      ;; There are multiple names in the same variable declaration.
+  (let ((elts (semantic-tag-name tag))
+        elt clone start end xpand)
+    ;; There are multiple names in the same variable declaration.
+    (when (consp elts)
       (while elts
         ;; For each name element, clone the initial tag and give it
         ;; the name of the element.
@@ -140,21 +139,41 @@ are the bounds in the declaration, related to this variable NAME."
         ;; Set the bounds of the cloned tag with those of the name
         ;; element.
         (semantic-tag-set-bounds clone start end)))
-     ((eq 'alias (semantic-tag-class tag))
-      (let ((names (semantic-tag-name tag))
-            (defs (semantic-tag-alias-definition tag)))
-        (when (and (consp names) (consp defs))
+    xpand))
+
+(defun wisent-php-expand-tag-alias (tag)
+  "Expand alias TAG into a list of equivalent alias tags.
+Expand multiple alias declaration in the same statement, that is
+tags of the class `alias' whose name is equal to a list of
+elements of the form (NAME START . END) and definition is a list
+of definitions corresponding to name elements.  NAME is a
+variable.  START and END are the bounds in the declaration,
+related to this variable NAME."
+  (let ((names (semantic-tag-name tag))
+        (defs (semantic-tag-alias-definition tag))
+        xpand '())
+    (when (and (consp names) (consp defs))
           (dotimes (i (length names))
             (let* ((elt (nth i names))
                    (def (nth i defs))
                    (name (car elt))
-                   (region (cdr elt)))
-              (setq clone (semantic-tag-new-alias name "alias" def)
-                    xpand (cons clone xpand)
-                    start (car region)
-                    end (cdr region))
-              (semantic-tag-set-bounds clone start end)))))))
+                   (region (cdr elt))
+                   (clone (semantic-tag-new-alias name "alias" def))
+                   (start (car region))
+                   (end (cdr region)))
+              (setq xpand (cons clone xpand))
+              (semantic-tag-set-bounds clone start end))))
     xpand))
+
+(defun wisent-php-expand-tag (tag)
+  "Expand TAG into a list of equivalent tags, or nil.
+
+Expand multiple variable or alias declarations merged into a single tag."
+  (cond
+   ((eq 'variable (semantic-tag-class tag))
+    (wisent-php-expand-tag-variable tag))
+   ((eq 'alias (semantic-tag-class tag))
+    (wisent-php-expand-tag-alias tag))))
 
 ;;;###autoload
 (add-hook 'php-mode-hook #'wisent-php-default-setup)
