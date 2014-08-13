@@ -120,7 +120,7 @@ Use the alternate LALR(1) parser."
   "Transform alias TAG into a tag that can be expanded.
 
 REGION is a cons START . END delimiting the definition region of the tag."
-  (semantic-tag-new-alias (cons (semantic-tag-name tag) region)
+  (semantic-tag-new-alias (list (cons (semantic-tag-name tag) region))
                           "alias"
                           (list (semantic-tag-alias-definition tag))))
 
