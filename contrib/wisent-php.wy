@@ -477,7 +477,7 @@ use_statement
 
 use_declarations
   : use_declaration T_COMMA use_declarations
-     (wisent-php-merge-alias $1 $region1 $3)
+    (wisent-php-merge-alias $1 $region1 $3)
   | use_declaration
     (wisent-php-create-merge-alias $1 $region1)
   ;
@@ -598,7 +598,7 @@ variable_declarator
 
 constant_declaration
   : T_CONST IDENTIFIER T_EQ variable_initializer T_SEMI
-    (VARIABLE-TAG $2 nil $region3 :typemodifiers $1)
+    (VARIABLE-TAG $2 nil $region3 :typemodifiers (list $1))
   ;
 
 reference_opt
