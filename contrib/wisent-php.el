@@ -61,10 +61,13 @@ MSG is the message string to report."
   "Get local values from a specific context.
 Parse the current context for `field_declaration' nonterminals to
 collect tags, such as local variables or prototypes.
-This function override `get-local-variables'."
+This function override `get-local-variables'.
+
+Add `$this' if needed"
   (let ((vars nil)
         ;; We want nothing to do with funny syntaxing while doing this.
         (semantic-unmatched-syntax-hook nil))
+    ;; Add function arguments
     (while (not (semantic-up-context (point) 'function))
       (save-excursion
         (forward-char 1)
@@ -75,6 +78,9 @@ This function override `get-local-variables'."
                        'field_declaration
                        0 t)
                       vars))))
+    (let ((class-tag (semantic-current-tag-of-class 'type)))
+      (when class-tag
+        (setq vars (cons (semantic-tag-new-variable "$this" class-tag) vars))))
     vars))
 
 ;;;;
@@ -96,7 +102,7 @@ Use the alternate LALR(1) parser."
    ;; Environment
    semantic-imenu-summary-function 'semantic-format-tag-prototype
    imenu-create-index-function 'semantic-create-imenu-index
-   semantic-type-relation-separator-character '(".")
+   semantic-type-relation-separator-character '("->")
    semantic-command-separation-character ";"
    semantic-lex-comment-regex "\\(/\\*\\|//\\|#\\)"
    ;; speedbar and imenu buckets name
@@ -167,7 +173,7 @@ related to this variable NAME."
   (let ((names (semantic-tag-name tag))
         (defs (semantic-tag-alias-definition tag))
         xpand '())
-    (when (and (consp names) (consp defs))
+    (when (and (listp names) (listp defs))
           (dotimes (i (length names))
             (let* ((elt (nth i names))
                    (def (nth i defs))
