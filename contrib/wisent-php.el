@@ -63,7 +63,7 @@ Parse the current context for `field_declaration' nonterminals to
 collect tags, such as local variables or prototypes.
 This function override `get-local-variables'.
 
-Add `$this' if needed"
+Add `$this', `static' and `self' if needed"
   (let ((vars nil)
         ;; We want nothing to do with funny syntaxing while doing this.
         (semantic-unmatched-syntax-hook nil))
@@ -80,7 +80,11 @@ Add `$this' if needed"
                       vars))))
     (let ((class-tag (semantic-current-tag-of-class 'type)))
       (when class-tag
-        (setq vars (cons (semantic-tag-new-variable "$this" class-tag) vars))))
+        (setq vars (append (list
+                            (semantic-tag-new-variable "$this" class-tag)
+                            (semantic-tag-new-variable "static" class-tag)
+                            (semantic-tag-new-variable "self" class-tag))
+                           vars))))
     vars))
 
 ;;;;
@@ -102,7 +106,7 @@ Use the alternate LALR(1) parser."
    ;; Environment
    semantic-imenu-summary-function 'semantic-format-tag-prototype
    imenu-create-index-function 'semantic-create-imenu-index
-   semantic-type-relation-separator-character '("->")
+   semantic-type-relation-separator-character '("->" "::")
    semantic-command-separation-character ";"
    semantic-lex-comment-regex "\\(/\\*\\|//\\|#\\)"
    ;; speedbar and imenu buckets name

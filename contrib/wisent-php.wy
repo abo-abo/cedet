@@ -598,7 +598,7 @@ variable_declarator
 
 constant_declaration
   : T_CONST IDENTIFIER T_EQ variable_initializer T_SEMI
-    (VARIABLE-TAG $2 nil $region3 :typemodifiers (list $1))
+    (VARIABLE-TAG $2 nil $region3 :typemodifiers (list "static" $1))
   ;
 
 reference_opt
