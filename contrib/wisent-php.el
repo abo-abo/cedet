@@ -67,17 +67,6 @@ Add `$this', `static' and `self' if needed"
   (let ((vars nil)
         ;; We want nothing to do with funny syntaxing while doing this.
         (semantic-unmatched-syntax-hook nil))
-    ;; Add function arguments
-    (while (not (semantic-up-context (point) 'function))
-      (save-excursion
-        (forward-char 1)
-        (setq vars
-              (append (semantic-parse-region
-                       (point)
-                       (save-excursion (semantic-end-of-context) (point))
-                       'field_declaration
-                       0 t)
-                      vars))))
     (let ((class-tag (semantic-current-tag-of-class 'type)))
       (when class-tag
         (setq vars (append (list
