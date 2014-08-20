@@ -517,6 +517,7 @@ interface_member_declaration
   | class_declaration
   | method_declaration
   | field_declaration
+  | constant_declaration
   ;
 
 function_declaration
