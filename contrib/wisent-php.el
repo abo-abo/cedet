@@ -77,6 +77,28 @@ Add `$this', `static' and `self' if needed"
     vars))
 
 ;;;;
+;;;; Member protection
+;;;;
+
+(define-mode-local-override semantic-tag-protection
+  php-mode (tag &optional parent)
+  "Return protection information about TAG with optional parent."
+  (let ((type-modifiers (semantic-tag-modifiers tag))
+        (protection nil))
+    (while (and type-modifiers (not protection))
+      (let ((modifier (car type-modifiers)))
+        (setq protection
+              (cond ((string= "private" modifier)
+                     'private)
+                    ((string= "protected" modifier)
+                     'protected)
+                    ((string= "public" modifier)
+                     'public)
+                    (t nil))))
+      (setq type-modifiers (cdr type-modifiers)))
+    (or protection 'public)))
+
+;;;;
 ;;;; Semantic integration of the Php LALR parser
 ;;;;
 
