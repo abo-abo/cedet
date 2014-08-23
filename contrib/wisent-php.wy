@@ -138,7 +138,7 @@
 
 ;; TODO integrate it to punctuation ?
 %type  <namespace-sep> syntax "\\s\\" matchdatatype string
-%token <namespace-sep> T_NAMESPACE_SEP    "\\"
+%token <namespace-sep> T_NAMESPACE_SEP
 
 ;; -----------------
 ;; Literal terminals

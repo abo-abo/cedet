@@ -117,7 +117,7 @@ Use the alternate LALR(1) parser."
    ;; Environment
    semantic-imenu-summary-function 'semantic-format-tag-prototype
    imenu-create-index-function 'semantic-create-imenu-index
-   semantic-type-relation-separator-character '("->" "::")
+   semantic-type-relation-separator-character '("->" "::" "\\")
    semantic-command-separation-character ";"
    semantic-lex-comment-regex "\\(/\\*\\|//\\|#\\)"
    ;; speedbar and imenu buckets name
