@@ -99,6 +99,28 @@ Add `$this', `static' and `self' if needed"
     (or protection 'public)))
 
 ;;;;
+;;;; Name splitting / unsplitting
+;;;;
+
+(define-mode-local-override semantic-analyze-split-name
+  php-mode (name)
+  "Split a tag NAME into a sequence.
+Sometimes NAMES are gathered from the parser that are componded.
+In PHP, \"foo\bar\" means :
+  \"The class BAR in the namespace FOO.\"
+Return the string NAME for no change, or a list if it needs to be split."
+  (let ((ans (split-string name (regexp-quote "\\"))))
+    (if (= (length ans) 1)
+        name
+    (delete "" ans))))
+
+(define-mode-local-override semantic-analyze-unsplit-name
+  php-mode (namelist)
+  "Assemble a NAMELIST into a string representing a compound name.
+In PHP, (\"foo\" \"bar\") becomes \"foo\\bar\"."
+  (mapconcat 'identity namelist "\\"))
+
+;;;;
 ;;;; Semantic integration of the Php LALR parser
 ;;;;
 
