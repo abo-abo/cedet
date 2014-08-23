@@ -135,10 +135,7 @@
 %token <punctuation> T_OR          	    "|"
 %token <punctuation> T_COMP        	    "~"
 %token <punctuation> T_ASTERISK        	    "@"
-
-;; TODO integrate it to punctuation ?
-%type  <namespace-sep> syntax "\\s\\" matchdatatype string
-%token <namespace-sep> T_NAMESPACE_SEP
+%token <punctuation> T_NAMESPACE_SEP    "\\"
 
 ;; -----------------
 ;; Literal terminals
@@ -905,7 +902,6 @@ It ignores whitespaces, newlines and comments."
   wisent-php-wy--<variable>-regexp-analyzer
   wisent-php-wy--<symbol>-regexp-analyzer
   wisent-php-wy--<punctuation>-string-analyzer
-  wisent-php-wy--<namespace-sep>-string-analyzer
   wisent-php-wy--<block>-block-analyzer
   ;;;;
   semantic-lex-default-action)

@@ -117,6 +117,7 @@ Use the alternate LALR(1) parser."
    ;; Environment
    semantic-imenu-summary-function 'semantic-format-tag-prototype
    imenu-create-index-function 'semantic-create-imenu-index
+   semantic-lex-syntax-modifications '((?\\ "."))
    semantic-type-relation-separator-character '("->" "::" "\\")
    semantic-command-separation-character ";"
    semantic-lex-comment-regex "\\(/\\*\\|//\\|#\\)"
