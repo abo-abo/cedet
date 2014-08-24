@@ -33,7 +33,10 @@
 
 (require 'ede/auto) ;; Autoload settings.
 
-(when (<= emacs-major-version 23)
+(when (or (<= emacs-major-version 23)
+	  ;; predicate as name added in Emacs 24.2
+	  (and (== emacs-major-version 24)
+	       (< emacs-minor-version 2)))
   (message "Loading CEDET fallback autoload library.")
   (require 'cedet/dominate
 	   (expand-file-name "../../../etc/fallback-libraries/dominate.el"
