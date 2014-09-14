@@ -200,12 +200,16 @@ rendered in a buffer, or serialized to disk.")
   (oset G buffer (current-buffer))
   )
 
+;; These needs to be evaluated during compile so it can be used by the
+;; below defclass.
+(eval-and-compile
 (defun cogre-position-p (posvector)
   "Test that POSVECTOR is a two element vector, and positive."
   (and (vectorp posvector)
        (= (length posvector) 2)
        (wholenump (aref posvector 0))
        (wholenump (aref posvector 1))))
+)
 
 ;;;###autoload
 (defclass cogre-node (cogre-graph-element)
