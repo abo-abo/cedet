@@ -1,0 +1,176 @@
+;;; config.el --- Configuration Handler baseclass
+;;
+;; Copyright (C) 2014 Eric Ludlam
+;;
+;; Author: Eric Ludlam <zappo@ballista>
+;;
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation, either version 3 of the
+;; License, or (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see http://www.gnu.org/licenses/.
+
+;;; Commentary:
+;;
+;; Some auto-detecting projects (such as the 'generic' project type)
+;; can be enhanced by also saving a configuration file that is EDE
+;; specific.  EDE will be able to load that configuration from the save
+;; file as a way of augmenting what is normally already detected.
+;; 
+;; How To Use:
+;;
+;; Subclass `ede-extra-config', and add the features you want to use.
+;; Several mixins are available for adding in C++ or Java support.  Bring
+;; in the pieces you need.
+;;
+;; Your project and targets should all have a common baseclass from
+;; `ede-project-with-config' or `ede-target-with-config'.  When
+;; subclassing the project, be sure to override the class allocated
+;; slots for the `config-class'.  This will tie your new project to
+;; the new configuration type.
+;;
+;; You can also override the file name used to save the configuration
+;; object in.
+;;
+;; If you need to take special action in `project-rescan' be sure to also
+;; call `call-next-method' to also get the configuration rescanned.
+
+;;; Code:
+(require 'ede)
+
+;;; CONFIG
+;;
+;; This is the base of a configuration class supported by the
+;; `ede-project-with-config' baseclass.
+;;
+(defclass ede-extra-config (eieio-persistent)
+  ((extension :initform ".ede")
+   (file-header-line :initform ";; EDE Project Configuration")
+   (project :type ede-project-with-config-child
+	    :documentation
+	    "The project this config is bound to.")
+   )
+  "Baseclass for auxilliary configuration files for EDE.
+This should be subclassed by projects that auto detect a project
+and also want to save some extra level of configuration.")
+
+;;; PROJECT BASECLASS
+;;
+;; Subclass this baseclass if you want your EDE project to also
+;; support saving an extra configuration file of unique data
+;; needed for this project.
+;;
+(defclass ede-project-with-config (ede-project)
+  ((config-file-basename
+    :initform "Config.ede"
+    :allocation :class
+    :type string
+    :documentation
+    "The filename to use for saving the configuration.
+This filename excludes the directory name and is used to
+initalize the :file slot of the persistent baseclass.")
+   (config-class
+    :initform ede-extra-config
+    :allocation :class
+    :type class
+    :documentation
+    "The class of the configuration used by this project.")
+   (config :initform nil
+	   :type (or null ede-extra-config-child)
+	   :documentation
+	   "The configuration object for this project.")
+   )
+  "Baseclass for projects that save a configuration.")
+
+(defclass ede-target-with-config (ede-target)
+  ()
+  "Baseclass for targetes of classes that use a config object.")
+
+;;; Rescanning
+
+(defmethod project-rescan ((this ede-project-with-config))
+  "Rescan this generic project from the sources."
+  ;; Force the config to be rescanned.
+  (oset this config nil)
+  (ede-config-get-configuration this))
+
+
+;;; Project Methods for configuration
+
+(defmethod ede-config-get-configuration ((proj ede-project-with-config))
+  "Return the configuration for the project PROJ."
+  (let ((config (oref proj config)))
+    (when (not config)
+      (let ((fname (expand-file-name (oref proj config-file-basename)
+				     (oref proj :directory)))
+	    (class (oref proj config-class)))
+	(if (file-exists-p fname)
+	    ;; Load in the configuration
+	    (setq config (eieio-persistent-read fname class))
+	  ;; Create a new one.
+	  (setq config (make-instance class
+				      "Configuration"
+				      :file fname))
+	  ;; Set initial values based on project.
+	  (ede-config-setup-configuration proj config))
+	;; Link things together.
+	(oset proj config config)
+	(oset config project proj)))
+    config))
+
+(defmethod ede-config-setup-configuration ((proj ede-project-with-config) config)
+  "Default configuration setup method."
+  nil)
+
+(defmethod ede-commit-project ((proj ede-project-with-config))
+  "Commit any change to PROJ to its file."
+  (let ((config (ede-config-get-configuration proj)))
+    (ede-commit config)))
+
+;;; Customization
+;;
+(defmethod ede-customize ((proj ede-project-with-config))
+  "Customize the EDE project PROJ by actually configuring the config object."
+  (let ((config (ede-config-get-configuration proj)))
+    (eieio-customize-object config)))
+
+(defmethod ede-customize ((target ede-target-with-config))
+  "Customize the EDE TARGET by actually configuring the config object."
+  ;; Nothing unique for the targets, use the project.
+  (ede-customize-project))
+
+(defmethod eieio-done-customizing ((config ede-extra-config))
+  "Called when EIEIO is done customizing the configuration object.
+We need to go back through the old buffers, and update them with
+the new configuration."
+  (ede-commit config)
+  ;; Loop over all the open buffers, and re-apply.
+  (ede-map-targets
+   (oref config project)
+   (lambda (target)
+     (ede-map-target-buffers
+      target
+      (lambda (b)
+	(with-current-buffer b
+	  (ede-apply-target-options)))))))
+
+(defmethod ede-commit ((config ede-extra-config))
+  "Commit all changes to the configuration to disk."
+  (eieio-persistent-save config))
+
+
+;; Local variables:
+;; generated-autoload-file: "loaddefs.el"
+;; generated-autoload-load-name: "ede/config"
+;; End:
+
+(provide 'ede/config)
+
+;;; config.el ends here
