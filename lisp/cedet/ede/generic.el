@@ -78,19 +78,15 @@
 ;; the above described support features.
 
 (require 'eieio-opt)
-(require 'ede)
+(require 'ede/config)
 (require 'ede/shell)
 (require 'semantic/db)
 
 ;;; Code:
 ;;
 ;; Start with the configuration system
-(defclass ede-generic-config (eieio-persistent)
-  ((extension :initform ".ede")
-   (file-header-line :initform ";; EDE Generic Project Configuration")
-   (project :initform nil
-	    :documentation
-	    "The project this config is bound to.")
+(defclass ede-generic-config (ede-extra-config)
+  ((file-header-line :initform ";; EDE Generic Project Configuration")
    ;; Generic customizations
    (build-command :initarg :build-command
 		  :initform "make -k"
@@ -181,7 +177,7 @@ ROOTPROJ is nil, since there is only one project."
     ))
 
 ;;; Base Classes for the system
-(defclass ede-generic-target (ede-target)
+(defclass ede-generic-target (ede-target-with-config)
   ((shortname :initform ""
 	     :type string
 	     :allocation :class
@@ -197,16 +193,14 @@ subclasses of this base target will override the default value.")
   "Baseclass for all targets belonging to the generic ede system."
   :abstract t)
 
-(defclass ede-generic-project (ede-project)
-  ((buildfile :initform ""
+(defclass ede-generic-project (ede-project-with-config)
+  ((config-class :initform ede-generic-config)
+   (config-file-basename :initform "EDEConfig.el")
+   (buildfile :initform ""
 	      :type string
 	      :allocation :class
 	      :documentation "The file name that identifies a project of this type.
 The class allocated value is replace by different sub classes.")
-   (config :initform nil
-	   :type (or null ede-generic-config)
-	   :documentation
-	   "The configuration object for this project.")
    )
   "The baseclass for all generic EDE project types."
   :abstract t)
@@ -227,35 +221,6 @@ The class allocated value is replace by different sub classes.")
 					      dir)
   "Return PROJ, for handling all subdirs below DIR."
   proj)
-
-(defmethod ede-generic-get-configuration ((proj ede-generic-project))
-  "Return the configuration for the project PROJ."
-  (let ((config (oref proj config)))
-    (when (not config)
-      (let ((fname (expand-file-name "EDEConfig.el"
-				     (oref proj :directory))))
-	(if (file-exists-p fname)
-	    ;; Load in the configuration
-	    (setq config (eieio-persistent-read fname 'ede-generic-config))
-	  ;; Create a new one.
-	  (setq config (ede-generic-config
-			"Configuration"
-			:file fname))
-	  ;; Set initial values based on project.
-	  (ede-generic-setup-configuration proj config))
-	;; Link things together.
-	(oset proj config config)
-	(oset config project proj)))
-    config))
-
-(defmethod ede-generic-setup-configuration ((proj ede-generic-project) config)
-  "Default configuration setup method."
-  nil)
-
-(defmethod ede-commit-project ((proj ede-generic-project))
-  "Commit any change to PROJ to its file."
-  (let ((config (ede-generic-get-configuration proj)))
-    (ede-commit config)))
 
 ;;; A list of different targets
 (defclass ede-generic-target-c-cpp (ede-generic-target)
@@ -343,7 +308,7 @@ If one doesn't exist, create a new one for this directory."
   "Get the pre-processor map for some generic C code."
   (let* ((proj (ede-target-parent this))
 	 (root (ede-project-root proj))
-	 (config (ede-generic-get-configuration proj))
+	 (config (ede-config-get-configuration proj))
 	 filemap
 	 )
     ;; Preprocessor files
@@ -364,20 +329,20 @@ If one doesn't exist, create a new one for this directory."
 (defmethod ede-system-include-path ((this ede-generic-target-c-cpp))
   "Get the system include path used by project THIS."
   (let* ((proj (ede-target-parent this))
-	(config (ede-generic-get-configuration proj)))
+	(config (ede-config-get-configuration proj)))
     (oref config c-include-path)))
 
 ;;; Java support
 (defmethod ede-java-classpath ((proj ede-generic-project))
   "Return the classpath for this project."
-  (oref (ede-generic-get-configuration proj) :classpath))
+  (oref (ede-config-get-configuration proj) :classpath))
 
 ;;; Commands
 ;;
 (defmethod project-compile-project ((proj ede-generic-project) &optional command)
   "Compile the entire current project PROJ.
 Argument COMMAND is the command to use when compiling."
-  (let* ((config (ede-generic-get-configuration proj))
+  (let* ((config (ede-config-get-configuration proj))
 	 (comp (oref config :build-command)))
     (compile comp)))
 
@@ -389,7 +354,7 @@ Argument COMMAND is the command to use for compiling the target."
 (defmethod project-debug-target ((target ede-generic-target))
   "Run the current project derived from TARGET in a debugger."
   (let* ((proj (ede-target-parent target))
-	 (config (ede-generic-get-configuration proj))
+	 (config (ede-config-get-configuration proj))
 	 (debug (oref config :debug-command))
 	 (cmd (read-from-minibuffer
 	       "Debug Command: "
@@ -404,47 +369,10 @@ Argument COMMAND is the command to use for compiling the target."
 (defmethod project-run-target ((target ede-generic-target))
   "Run the current project derived from TARGET."
   (let* ((proj (ede-target-parent target))
-	 (config (ede-generic-get-configuration proj))
+	 (config (ede-config-get-configuration proj))
 	 (run (concat "./" (oref config :run-command)))
 	 (cmd (read-from-minibuffer "Run (like this): " run)))
     (ede-shell-run-something target cmd)))
-
-(defmethod project-rescan ((this ede-generic-project))
-  "Rescan this generic project from the sources."
-  ;; Force the config to be rescanned.
-  (oset this config nil)
-  (ede-generic-get-configuration this))
-
-;;; Customization
-;;
-(defmethod ede-customize ((proj ede-generic-project))
-  "Customize the EDE project PROJ."
-  (let ((config (ede-generic-get-configuration proj)))
-    (eieio-customize-object config)))
-
-(defmethod ede-customize ((target ede-generic-target))
-  "Customize the EDE TARGET."
-  ;; Nothing unique for the targets, use the project.
-  (ede-customize-project))
-
-(defmethod eieio-done-customizing ((config ede-generic-config))
-  "Called when EIEIO is done customizing the configuration object.
-We need to go back through the old buffers, and update them with
-the new configuration."
-  (ede-commit config)
-  ;; Loop over all the open buffers, and re-apply.
-  (ede-map-targets
-   (oref config project)
-   (lambda (target)
-     (ede-map-target-buffers
-      target
-      (lambda (b)
-	(with-current-buffer b
-	  (ede-apply-target-options)))))))
-
-(defmethod ede-commit ((config ede-generic-config))
-  "Commit all changes to the configuration to disk."
-  (eieio-persistent-save config))
 
 ;;; Creating Derived Projects:
 ;;
