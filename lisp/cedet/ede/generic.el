@@ -85,33 +85,10 @@
 ;;; Code:
 ;;
 ;; Start with the configuration system
-(defclass ede-generic-config (ede-extra-config)
+(defclass ede-generic-config (ede-extra-config
+			      ede-extra-config-build
+			      ede-extra-config-program)
   ((file-header-line :initform ";; EDE Generic Project Configuration")
-   ;; Generic customizations
-   (build-command :initarg :build-command
-		  :initform "make -k"
-		  :type string
-		  :group commands
-		  :custom string
-		  :group (default build)
-		  :documentation
-		  "Command used for building this project.")
-   (debug-command :initarg :debug-command
-		  :initform "gdb "
-		  :type string
-		  :group commands
-		  :custom string
-		  :group (default build)
-		  :documentation
-		  "Command used for debugging this project.")
-   (run-command :initarg :run-command
-		:initform ""
-		:type string
-		:group commands
-		:custom string
-		:group (default build)
-		:documentation
-		"Command used to run something related to this project.")
    ;; C / C++ target customizations
    (c-include-path :initarg :c-include-path
 		   :initform nil
@@ -177,7 +154,9 @@ ROOTPROJ is nil, since there is only one project."
     ))
 
 ;;; Base Classes for the system
-(defclass ede-generic-target (ede-target-with-config)
+(defclass ede-generic-target (ede-target-with-config
+			      ede-target-with-config-build
+			      ede-target-with-config-program)
   ((shortname :initform ""
 	     :type string
 	     :allocation :class
@@ -193,7 +172,9 @@ subclasses of this base target will override the default value.")
   "Baseclass for all targets belonging to the generic ede system."
   :abstract t)
 
-(defclass ede-generic-project (ede-project-with-config)
+(defclass ede-generic-project (ede-project-with-config
+			       ede-project-with-config-build
+			       ede-project-with-config-program)
   ((config-class :initform ede-generic-config)
    (config-file-basename :initform "EDEConfig.el")
    (buildfile :initform ""
@@ -339,40 +320,7 @@ If one doesn't exist, create a new one for this directory."
 
 ;;; Commands
 ;;
-(defmethod project-compile-project ((proj ede-generic-project) &optional command)
-  "Compile the entire current project PROJ.
-Argument COMMAND is the command to use when compiling."
-  (let* ((config (ede-config-get-configuration proj))
-	 (comp (oref config :build-command)))
-    (compile comp)))
 
-(defmethod project-compile-target ((obj ede-generic-target) &optional command)
-  "Compile the current target OBJ.
-Argument COMMAND is the command to use for compiling the target."
-  (project-compile-project (ede-current-project) command))
-
-(defmethod project-debug-target ((target ede-generic-target))
-  "Run the current project derived from TARGET in a debugger."
-  (let* ((proj (ede-target-parent target))
-	 (config (ede-config-get-configuration proj))
-	 (debug (oref config :debug-command))
-	 (cmd (read-from-minibuffer
-	       "Debug Command: "
-	       debug))
-	 (cmdsplit (split-string cmd " " t))
-	 ;; @TODO - this depends on the user always typing in something good
-	 ;;  like "gdb" or "dbx" which also exists as a useful Emacs command.
-	 ;;  Is there a better way?
-	 (cmdsym (intern-soft (car cmdsplit))))
-    (call-interactively cmdsym t)))
-
-(defmethod project-run-target ((target ede-generic-target))
-  "Run the current project derived from TARGET."
-  (let* ((proj (ede-target-parent target))
-	 (config (ede-config-get-configuration proj))
-	 (run (concat "./" (oref config :run-command)))
-	 (cmd (read-from-minibuffer "Run (like this): " run)))
-    (ede-shell-run-something target cmd)))
 
 ;;; Creating Derived Projects:
 ;;
