@@ -165,6 +165,101 @@ the new configuration."
   "Commit all changes to the configuration to disk."
   (eieio-persistent-save config))
 
+;;; PROJECT MIXINS
+;;
+;; These are project part mixins.  Use multiple inheritence for each
+;; piece of these configuration optiosn you would like to have as part
+;; of your project.
+
+;;; PROGRAM
+;; If there is a program that can be run or debugged that is unknown
+;; and needs to be configured. 
+(defclass ede-extra-config-program ()
+  ((debug-command :initarg :debug-command
+		  :initform "gdb "
+		  :type string
+		  :group commands
+		  :custom string
+		  :group (default build)
+		  :documentation
+		  "Command used for debugging this project.")
+   (run-command :initarg :run-command
+		:initform ""
+		:type string
+		:group commands
+		:custom string
+		:group (default build)
+		:documentation
+		"Command used to run something related to this project."))
+  "Class to mix into a configuration for debug/run of programs.")
+
+(defclass ede-project-with-config-program ()
+  ()
+  "Class to mix into a project with configuration for programs.")
+
+(defclass ede-target-with-config-program ()
+  ()
+  "Class to mix into a project with configuration for programs.
+This class brings in method overloads for running and debugging
+programs from a project.")
+
+(defmethod project-debug-target ((target ede-target-with-config-program))
+  "Run the current project derived from TARGET in a debugger."
+  (let* ((proj (ede-target-parent target))
+	 (config (ede-config-get-configuration proj))
+	 (debug (oref config :debug-command))
+	 (cmd (read-from-minibuffer
+	       "Debug Command: "
+	       debug))
+	 (cmdsplit (split-string cmd " " t))
+	 ;; @TODO - this depends on the user always typing in something good
+	 ;;  like "gdb" or "dbx" which also exists as a useful Emacs command.
+	 ;;  Is there a better way?
+	 (cmdsym (intern-soft (car cmdsplit))))
+    (call-interactively cmdsym t)))
+
+(defmethod project-run-target ((target ede-target-with-config-program))
+  "Run the current project derived from TARGET."
+  (let* ((proj (ede-target-parent target))
+	 (config (ede-config-get-configuration proj))
+	 (run (concat "./" (oref config :run-command)))
+	 (cmd (read-from-minibuffer "Run (like this): " run)))
+    (ede-shell-run-something target cmd)))
+
+;;; BUILD
+;; If the build style is unknown and needs to be configured.
+(defclass ede-extra-config-build ()
+  ((build-command :initarg :build-command
+		  :initform "make -k"
+		  :type string
+		  :group commands
+		  :custom string
+		  :group (default build)
+		  :documentation
+		  "Command used for building this project."))
+  "Class to mix into a configuration for compilation.")
+
+(defclass ede-project-with-config-build ()
+  ()
+  "Class to mix into a project with configuration for builds.
+This class brings in method overloads for building.")
+
+(defclass ede-target-with-config-build ()
+  ()
+  "Class to mix into a project with configuration for builds.
+This class brings in method overloads for for building.")
+
+(defmethod project-compile-project ((proj ede-project-with-config-build) &optional command)
+  "Compile the entire current project PROJ.
+Argument COMMAND is the command to use when compiling."
+  (let* ((config (ede-config-get-configuration proj))
+	 (comp (oref config :build-command)))
+    (compile comp)))
+
+(defmethod project-compile-target ((obj ede-target-with-config-build) &optional command)
+  "Compile the current target OBJ.
+Argument COMMAND is the command to use for compiling the target."
+  (project-compile-project (ede-current-project) command))
 
 ;; Local variables:
 ;; generated-autoload-file: "loaddefs.el"
