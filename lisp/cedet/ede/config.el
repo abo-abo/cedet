@@ -261,6 +261,101 @@ Argument COMMAND is the command to use when compiling."
 Argument COMMAND is the command to use for compiling the target."
   (project-compile-project (ede-current-project) command))
 
+;;; C / C++
+;; Configure includes and preprocessor symbols for C/C++ needed by
+;; Semantic.
+(defclass ede-extra-config-c ()
+  ((c-include-path :initarg :c-include-path
+		   :initform nil
+		   :type list
+		   :custom (repeat (string :tag "Path"))
+		   :group c
+		   :documentation
+		   "The include path used by C/C++ projects.
+The include path is used when searching for symbols.")
+   (c-preprocessor-table :initarg :c-preprocessor-table
+			 :initform nil
+			 :type list
+			 :custom (repeat (cons (string :tag "Macro")
+					       (string :tag "Value")))
+			 :group c
+			 :documentation
+			 "Preprocessor Symbols for this project.
+When files within this project are parsed by CEDET, these symbols will be
+used to resolve macro occurrences in source fies.
+If you modify this slot, you will need to force your source files to be
+parsed again.")
+   (c-preprocessor-files :initarg :c-preprocessor-files
+			 :initform nil
+			 :type list
+			 :group c
+			 :custom (repeat (string :tag "Include File"))
+			 :documentation
+			 "Files parsed and used to populate preprocessor tables.
+When files within this project are parsed by CEDET, these symbols will be used to
+resolve macro occurences in source files.
+If you modify this slot, you will need to force your source files to be
+parsed again."))
+  "Class to mix into a configuration for compilation.")
+
+(defclass ede-project-with-config-c ()
+  ()
+  "Class to mix into a project for C/C++ support.")
+
+(defclass ede-target-with-config-c ()
+  ()
+  "Class to mix into a project for C/C++ support.
+This target brings in methods used by Semantic to query
+the preprocessor map, and include paths.")
+
+(defmethod ede-preprocessor-map ((this ede-target-with-config-c))
+  "Get the pre-processor map for some generic C code."
+  (let* ((proj (ede-target-parent this))
+	 (root (ede-project-root proj))
+	 (config (ede-config-get-configuration proj))
+	 filemap
+	 )
+    ;; Preprocessor files
+    (dolist (G (oref config :c-preprocessor-files))
+      (let ((table (semanticdb-file-table-object
+		    (ede-expand-filename root G))))
+	(when table
+	  (when (semanticdb-needs-refresh-p table)
+	    (semanticdb-refresh-table table))
+	  (setq filemap (append filemap (oref table lexical-table)))
+	  )))
+    ;; The core table
+    (setq filemap (append filemap (oref config :c-preprocessor-table)))
+
+    filemap
+    ))
+
+(defmethod ede-system-include-path ((this ede-target-with-config-c))
+  "Get the system include path used by project THIS."
+  (let* ((proj (ede-target-parent this))
+	(config (ede-config-get-configuration proj)))
+    (oref config c-include-path)))
+
+;;; Java
+;; Configuration needed for programming with Java.
+(defclass ede-extra-config-java ()
+  ()
+  "Class to mix into a configuration for compilation.")
+
+(defclass ede-project-with-config-java ()
+  ()
+  "Class to mix into a project to support java.
+This brings in methods to support Semantic querying the
+java class path.")
+
+(defclass ede-target-with-config-java ()
+  ()
+  "Class to mix into a project to support java.")
+
+(defmethod ede-java-classpath ((proj ede-project-with-config-java))
+  "Return the classpath for this project."
+  (oref (ede-config-get-configuration proj) :classpath))
+
 ;; Local variables:
 ;; generated-autoload-file: "loaddefs.el"
 ;; generated-autoload-load-name: "ede/config"
