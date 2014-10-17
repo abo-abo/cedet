@@ -87,49 +87,9 @@
 ;; Start with the configuration system
 (defclass ede-generic-config (ede-extra-config
 			      ede-extra-config-build
-			      ede-extra-config-program)
+			      ede-extra-config-program
+			      ede-extra-config-c)
   ((file-header-line :initform ";; EDE Generic Project Configuration")
-   ;; C / C++ target customizations
-   (c-include-path :initarg :c-include-path
-		   :initform nil
-		   :type list
-		   :custom (repeat (string :tag "Path"))
-		   :group c
-		   :documentation
-		   "The include path used by C/C++ projects.
-The include path is used when searching for symbols.")
-   (c-preprocessor-table :initarg :c-preprocessor-table
-			 :initform nil
-			 :type list
-			 :custom (repeat (cons (string :tag "Macro")
-					       (string :tag "Value")))
-			 :group c
-			 :documentation
-			 "Preprocessor Symbols for this project.
-When files within this project are parsed by CEDET, these symbols will be
-used to resolve macro occurrences in source fies.
-If you modify this slot, you will need to force your source files to be
-parsed again.")
-   (c-preprocessor-files :initarg :c-preprocessor-files
-			 :initform nil
-			 :type list
-			 :group c
-			 :custom (repeat (string :tag "Include File"))
-			 :documentation
-			 "Files parsed and used to populate preprocessor tables.
-When files within this project are parsed by CEDET, these symbols will be used to
-resolve macro occurences in source files.
-If you modify this slot, you will need to force your source files to be
-parsed again.")
-   ;; Java target customizations
-   (classpath :initarg :classpath
-	      :initform nil
-	      :type list
-	      :group java
-	      :custom (repeat (string :tag "Classpath"))
-	      :documentation
-	      "The default classpath used within a project.
-All files listed in the local path are full paths to files.")
    )
   "User Configuration object for a generic project.")
 
@@ -174,7 +134,9 @@ subclasses of this base target will override the default value.")
 
 (defclass ede-generic-project (ede-project-with-config
 			       ede-project-with-config-build
-			       ede-project-with-config-program)
+			       ede-project-with-config-program
+			       ede-project-with-config-c
+			       ede-project-with-config-java)
   ((config-class :initform ede-generic-config)
    (config-file-basename :initform "EDEConfig.el")
    (buildfile :initform ""
@@ -204,7 +166,8 @@ The class allocated value is replace by different sub classes.")
   proj)
 
 ;;; A list of different targets
-(defclass ede-generic-target-c-cpp (ede-generic-target)
+(defclass ede-generic-target-c-cpp (ede-generic-target
+				    ede-target-with-config-c)
   ((shortname :initform "C/C++")
    (extension :initform "\\([ch]\\(pp\\|xx\\|\\+\\+\\)?\\|cc\\|hh\\|CC?\\)"))
   "EDE Generic Project target for C and C++ code.
@@ -228,7 +191,8 @@ All directories need at least one target.")
   "EDE Generic Project target for texinfo code.
 All directories need at least one target.")
 
-(defclass ede-generic-target-java (ede-generic-target)
+(defclass ede-generic-target-java (ede-generic-target
+				   ede-target-with-config-java)
   ((shortname :initform "Java")
    (extension :initform "java"))
   "EDE Generic Project target for texinfo code.
@@ -283,44 +247,6 @@ If one doesn't exist, create a new one for this directory."
       (object-add-to-list proj :targets ans)
       )
     ans))
-
-;;; C/C++ support
-(defmethod ede-preprocessor-map ((this ede-generic-target-c-cpp))
-  "Get the pre-processor map for some generic C code."
-  (let* ((proj (ede-target-parent this))
-	 (root (ede-project-root proj))
-	 (config (ede-config-get-configuration proj))
-	 filemap
-	 )
-    ;; Preprocessor files
-    (dolist (G (oref config :c-preprocessor-files))
-      (let ((table (semanticdb-file-table-object
-		    (ede-expand-filename root G))))
-	(when table
-	  (when (semanticdb-needs-refresh-p table)
-	    (semanticdb-refresh-table table))
-	  (setq filemap (append filemap (oref table lexical-table)))
-	  )))
-    ;; The core table
-    (setq filemap (append filemap (oref config :c-preprocessor-table)))
-
-    filemap
-    ))
-
-(defmethod ede-system-include-path ((this ede-generic-target-c-cpp))
-  "Get the system include path used by project THIS."
-  (let* ((proj (ede-target-parent this))
-	(config (ede-config-get-configuration proj)))
-    (oref config c-include-path)))
-
-;;; Java support
-(defmethod ede-java-classpath ((proj ede-generic-project))
-  "Return the classpath for this project."
-  (oref (ede-config-get-configuration proj) :classpath))
-
-;;; Commands
-;;
-
 
 ;;; Creating Derived Projects:
 ;;
