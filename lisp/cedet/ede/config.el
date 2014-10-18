@@ -99,21 +99,31 @@ initalize the :file slot of the persistent baseclass.")
   "Rescan this generic project from the sources."
   ;; Force the config to be rescanned.
   (oset this config nil)
-  (ede-config-get-configuration this))
-
+  ;; Ask if it is safe to load the config from disk.
+  (ede-config-get-configuration this t)
+  )
 
 ;;; Project Methods for configuration
 
-(defmethod ede-config-get-configuration ((proj ede-project-with-config))
-  "Return the configuration for the project PROJ."
+(defmethod ede-config-get-configuration ((proj ede-project-with-config) &optional loadask)
+  "Return the configuration for the project PROJ.
+If optional LOADASK is non-nil, then if a project file exists, and if
+the directory isn't on the `safe' list, ask to add it to the safe list."
   (let ((config (oref proj config)))
     (when (not config)
-      (let ((fname (expand-file-name (oref proj config-file-basename)
-				     (oref proj :directory)))
-	    (class (oref proj config-class)))
-	(if (file-exists-p fname)
+      (let* ((top (oref proj :directory))
+	     (fname (expand-file-name (oref proj config-file-basename) top))
+	     (class (oref proj config-class)))
+	(if (and (file-exists-p fname) 
+		 (or (ede-directory-safe-p top)
+		     ;; Only force the load if someone asked.
+		     (and loadask (ede-check-project-directory top))))
 	    ;; Load in the configuration
 	    (setq config (eieio-persistent-read fname class))
+	  ;; If someone said not to load stuff from here then
+	  ;; pop up a warning.
+	  (when (file-exists-p fname)
+	    (message "Ignoring current config file and creating a new one.  Use C-c . g to load."))
 	  ;; Create a new one.
 	  (setq config (make-instance class
 				      "Configuration"
@@ -138,7 +148,7 @@ initalize the :file slot of the persistent baseclass.")
 ;;
 (defmethod ede-customize ((proj ede-project-with-config))
   "Customize the EDE project PROJ by actually configuring the config object."
-  (let ((config (ede-config-get-configuration proj)))
+  (let ((config (ede-config-get-configuration proj t)))
     (eieio-customize-object config)))
 
 (defmethod ede-customize ((target ede-target-with-config))
@@ -163,6 +173,11 @@ the new configuration."
 
 (defmethod ede-commit ((config ede-extra-config))
   "Commit all changes to the configuration to disk."
+  ;; So long as the user is trying to safe this config, make sure they can
+  ;; get at it again later.
+  (let ((dir (file-name-directory (oref config file))))
+    (ede-check-project-directory dir))
+
   (eieio-persistent-save config))
 
 ;;; PROJECT MIXINS
@@ -206,7 +221,7 @@ programs from a project.")
 (defmethod project-debug-target ((target ede-target-with-config-program))
   "Run the current project derived from TARGET in a debugger."
   (let* ((proj (ede-target-parent target))
-	 (config (ede-config-get-configuration proj))
+	 (config (ede-config-get-configuration proj t))
 	 (debug (oref config :debug-command))
 	 (cmd (read-from-minibuffer
 	       "Debug Command: "
@@ -221,7 +236,7 @@ programs from a project.")
 (defmethod project-run-target ((target ede-target-with-config-program))
   "Run the current project derived from TARGET."
   (let* ((proj (ede-target-parent target))
-	 (config (ede-config-get-configuration proj))
+	 (config (ede-config-get-configuration proj t))
 	 (run (concat "./" (oref config :run-command)))
 	 (cmd (read-from-minibuffer "Run (like this): " run)))
     (ede-shell-run-something target cmd)))
@@ -252,7 +267,7 @@ This class brings in method overloads for for building.")
 (defmethod project-compile-project ((proj ede-project-with-config-build) &optional command)
   "Compile the entire current project PROJ.
 Argument COMMAND is the command to use when compiling."
-  (let* ((config (ede-config-get-configuration proj))
+  (let* ((config (ede-config-get-configuration proj t))
 	 (comp (oref config :build-command)))
     (compile comp)))
 
