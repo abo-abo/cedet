@@ -148,7 +148,7 @@ the directory isn't on the `safe' list, ask to add it to the safe list."
 	  ;; If someone said not to load stuff from here then
 	  ;; pop up a warning.
 	  (when (file-exists-p fname)
-	    (message "Ignoring current config file and creating a new one.  Use C-c . g to load.")
+	    (message "Ignoring EDE config file for now and creating a new one.  Use C-c . g to load it.")
 	    ;; Set how it was ignored.
 	    (if loadask
 		(setq ignore-type 'manual)
