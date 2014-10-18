@@ -270,10 +270,12 @@ the class `ede-generic-project' project."
 			 :load-type 'ede-generic-load
 			 :class-sym class
 			 :new-p nil
-			 :safe-p nil)	; @todo - could be
-					; safe if we do something
-					; about the loading of the
-					; generic config file.
+			 ;; NOTE: This project type is SAFE because it handles
+			 ;; the user-query before loading its config file.  These
+			 ;; project types are useful without the config file so
+			 ;; do the safe part until the user creates a saved config
+			 ;; file for it.
+			 :safe-p t)
    ;; Generics must go at the end, since more specific types
    ;; can create Makefiles also.
    'generic))
