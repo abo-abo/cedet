@@ -41,6 +41,15 @@
 ;;
 ;; If you need to take special action in `project-rescan' be sure to also
 ;; call `call-next-method' to also get the configuration rescanned.
+;;
+;; Note on config file safety:
+;;
+;; Normally an EDE project that loads a save file should have it's
+;; autoload slot :safe-p set to nil.  Projects who save data via
+;; config.el can mark their project as :safe-p t.  The config system will
+;; do the queries needed to protect the user.  This allows a generic
+;; project to become active in cases where no save file exists, nor is
+;; needed.
 
 ;;; Code:
 (require 'ede)
