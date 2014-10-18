@@ -65,6 +65,12 @@
    (project :type ede-project-with-config-child
 	    :documentation
 	    "The project this config is bound to.")
+   (ignored-file :initform nil
+		 :type (or null symbol)
+		 :documentation
+		 "Set to non-nil if this was created and an on-disk file
+was ignored.  Use this to warn the user that they might want to load in
+an on-disk version.")
    )
   "Baseclass for auxilliary configuration files for EDE.
 This should be subclassed by projects that auto detect a project
@@ -119,10 +125,20 @@ initalize the :file slot of the persistent baseclass.")
 If optional LOADASK is non-nil, then if a project file exists, and if
 the directory isn't on the `safe' list, ask to add it to the safe list."
   (let ((config (oref proj config)))
+
+    ;; If the request is coming at a time when we want to ask the user,
+    ;; and there already is a configuration, AND the last time we ignored
+    ;; the on-file version we did so automatically (without asking) then
+    ;; in theory there are NO mods to this config, and we should re-ask,
+    ;; and possibly re-load.
+    (when (and loadask config (eq (oref config ignored-file) 'auto))
+      (setq config nil))
+
     (when (not config)
       (let* ((top (oref proj :directory))
 	     (fname (expand-file-name (oref proj config-file-basename) top))
-	     (class (oref proj config-class)))
+	     (class (oref proj config-class))
+	     (ignore-type nil))	
 	(if (and (file-exists-p fname) 
 		 (or (ede-directory-safe-p top)
 		     ;; Only force the load if someone asked.
@@ -132,11 +148,18 @@ the directory isn't on the `safe' list, ask to add it to the safe list."
 	  ;; If someone said not to load stuff from here then
 	  ;; pop up a warning.
 	  (when (file-exists-p fname)
-	    (message "Ignoring current config file and creating a new one.  Use C-c . g to load."))
+	    (message "Ignoring current config file and creating a new one.  Use C-c . g to load.")
+	    ;; Set how it was ignored.
+	    (if loadask
+		(setq ignore-type 'manual)
+	      (setq ignore-type 'auto))
+	    )
 	  ;; Create a new one.
 	  (setq config (make-instance class
 				      "Configuration"
 				      :file fname))
+	  (oset config ignored-file ignore-type)
+
 	  ;; Set initial values based on project.
 	  (ede-config-setup-configuration proj config))
 	;; Link things together.
