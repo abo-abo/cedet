@@ -714,6 +714,10 @@ Otherwise, create a new project for DIR."
     (error "%s is not an allowed project directory in `ede-project-directories'"
 	   dir)))
 
+(defvar ede-check-project-query-fcn 'y-or-n-p
+  "Function used to ask the user if they want to permit a project to load.
+This is abstracted out so that tests can answer this question.")
+
 (defun ede-check-project-directory (dir)
   "Check if DIR should be in `ede-project-directories'.
 If it is not, try asking the user if it should be added; if so,
@@ -726,9 +730,10 @@ Return nil iff DIR should not be in `ede-project-directories'."
       ;; If `ede-project-directories' is a list, maybe add it.
       (when (listp ede-project-directories)
 	(or (member dir ede-project-directories)
-	    (when (y-or-n-p (format "`%s' is not listed in `ede-project-directories'.
+	    (when (funcall ede-check-project-query-fcn
+			   (format "`%s' is not listed in `ede-project-directories'.
 Add it to the list of allowed project directories? "
-				    dir))
+				   dir))
 	      (push dir ede-project-directories)
 	      ;; If possible, save `ede-project-directories'.
 	      (if (or custom-file user-init-file)
