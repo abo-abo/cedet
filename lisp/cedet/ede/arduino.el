@@ -30,7 +30,7 @@
 ;; To download an arduino mode for your code, see this mode:
 ;; https://github.com/bookest/arduino-mode
 
-(require 'ede)
+(require 'ede/config)
 
 (declare-function data-debug-show-stuff "data-debug")
 
@@ -46,16 +46,29 @@ Note: If this changes, we need to also update the autoload feature."
   :group 'arduino
   :type 'string)
 
+;;; CONFIG
+;;
+;; Extra Configuration for each arduino project.
+(defclass ede-arduino-config (ede-extra-config
+			      ede-extra-config-c)
+  ((file-header-line :initform ";; EDE Arduino Project Configuration")
+   
+   )
+  "User Configuration object for a arduino project.")
+
 ;;; CLASSES
 ;;
 ;; The classes for arduino projects include arduino (PDE) files, plus C, CPP, and H files.
 ;;
-(defclass ede-arduino-target (ede-target)
+(defclass ede-arduino-target (ede-target-with-config
+			      ede-target-with-config-c)
   ()
   "EDE Arduino C files target.  Includes PDE, C, C++ and anything else we find.")
 
-(defclass ede-arduino-project (ede-project)
+(defclass ede-arduino-project (ede-project-with-config
+			       ede-project-with-config-c)
   ((keybindings :initform (("U" . ede-arduino-upload)))
+   (config-class :initform ede-arduino-config)
    (menu :initform
 	 (
 	  [ "Upload Project to Board" ede-arduino-upload ]
@@ -220,6 +233,7 @@ Argument COMMAND is the command to use for compiling the target."
 
 (defmethod project-rescan ((this ede-arduino-project))
   "Rescan all project files associated with THIS project."
+  (call-next-method)
   (ede-arduino-sync))
 
 ;;; C/C++ support
@@ -227,7 +241,8 @@ Argument COMMAND is the command to use for compiling the target."
 (defmethod ede-preprocessor-map ((this ede-arduino-target))
   "Get the pre-processor map for some generic C code."
   ;; wiring.h and pins_arduino.h have lots of #defines in them.
-  (let* ((wiring_h (expand-file-name "hardware/arduino/cores/arduino/wiring.h"
+  (let* ((fromconfig (call-next-method))
+	 (wiring_h (expand-file-name "hardware/arduino/cores/arduino/wiring.h"
 				     (ede-arduino-find-install)))
 	 (table (when (and wiring_h (file-exists-p wiring_h))
 		  (semanticdb-file-table-object wiring_h)))
@@ -240,12 +255,13 @@ Argument COMMAND is the command to use for compiling the target."
 	(semanticdb-refresh-table table))
       (setq filemap (append filemap (oref table lexical-table)))
       )
-    filemap
+    (append filemap fromconfig)
     ))
 
 (defmethod ede-system-include-path ((this ede-arduino-target))
   "Get the system include path used by project THIS."
-  (let* ((prefs (ede-arduino-sync))
+  (let* ((fromconfig (call-next-method))
+	 (prefs (ede-arduino-sync))
 	 (iphardware (expand-file-name "hardware/arduino/cores/arduino"
 				       (ede-arduino-find-install)))
 	 (libs (ede-arduino-guess-libs))
@@ -254,7 +270,7 @@ Argument COMMAND is the command to use for compiling the target."
 		    (expand-file-name (concat "libraries/" lib)
 				      (ede-arduino-find-install)))
 		  libs)))
-    (cons iphardware iplibs)))
+    (append (cons iphardware iplibs) fromconfig)))
 
 ;;; Makefile Creation
 ;;
