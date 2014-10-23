@@ -52,9 +52,34 @@ Note: If this changes, we need to also update the autoload feature."
 (defclass ede-arduino-config (ede-extra-config
 			      ede-extra-config-c)
   ((file-header-line :initform ";; EDE Arduino Project Configuration")
-   
+   ;; Configuration for the board &  Serial port
+   (board :initarg :board
+	  :initform nil
+	  :type (or null string)
+	  :custom (choice string (const :tag "Use Arduino IDE preference" nil))
+	  :group (default arduino)
+	  :documentation
+	  "An arduino board that represents the upload target.
+A nil/empty value means to use the default value from the Arduino IDE preferences.")
+   (boardobj :initform nil
+	     :documentation
+	     "Runtime cache of the board data loaded from and aruidno config file.")
+   (port :initarg :port
+	 :initform nil
+	 :type (or null string)
+	 :custom (choice string (const :tag "Use Arduino IDE preference" nil))
+	  :group (default arduino)
+	 :documentation
+	 "The serial port used to upload programs to the target board.
+A nil/empty value means to use the default value from the Arduino IDE preferences.")
    )
   "User Configuration object for a arduino project.")
+
+(defmethod eieio-done-customizing ((config ede-arduino-config))
+  "Called when EIEIO is done customizing the configuration object.
+Force the boardobj slot to be flushed."
+  (oset config boardobj nil)
+  (call-next-method))
 
 ;;; CLASSES
 ;;
@@ -69,6 +94,7 @@ Note: If this changes, we need to also update the autoload feature."
 			       ede-project-with-config-c)
   ((keybindings :initform (("U" . ede-arduino-upload)))
    (config-class :initform ede-arduino-config)
+   (config-file-basename :initform "Arduino.ede")
    (menu :initform
 	 (
 	  [ "Upload Project to Board" ede-arduino-upload ]
@@ -156,8 +182,14 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
   ;; Create a new project here.
   (let* ((name (file-name-nondirectory (directory-file-name dir)))
 	 (pde (expand-file-name (concat name ".pde") dir)))
+    ;; Upgrade from PDE to INO
     (when (not (file-exists-p pde))
       (setq pde (expand-file-name (concat name ".ino") dir)))
+    
+    ;; If there is no such script yet, then look for the Arduino config file.
+    (when (not (file-exists-p pde))
+      (setq pde (expand-file-name "Arduino.ede" dir)))
+
     (ede-arduino-project
      name
      :name name
@@ -169,7 +201,7 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
 (ede-add-project-autoload
  (ede-project-autoload
   "arduino"
-  :name "ARDUINO SKETCH"
+  :name "ARDUINO SKETCHBOOK"
   :file 'ede/arduino
   :root-only nil
   :proj-root-dirmatch
@@ -190,6 +222,21 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
   :new-p t)
  'unique)
 
+;; this causes the detect unit test to fail.  Figure that out sometime.
+;;;;###autoload
+;(ede-add-project-autoload
+; (ede-project-autoload
+;  "arduino"
+;  :name "ARDUINO"
+;  :file 'ede/arduino
+;  :root-only t
+;  :proj-file "Arduino.ede"
+;  :load-type 'ede-arduino-load
+;  :class-sym 'ede-arduino-project
+;  :safe-p t
+;  :new-p t))
+
+
 ;;; COMMAND SUPPORT
 ;;
 (defun ede-arduino-upload ()
@@ -204,10 +251,10 @@ ROOTPROJ is nil, sinc there is only one project for a directory tree."
   "Start up a serial monitor for a running arduino board.
 Uses `serial-term'."
   (interactive)
-  (let ((prefs (ede-arduino-sync)))
+  (let ((proj ede-object-root-project))
     ;; @TODO - read the setup function for something configuring the
     ;; serial line w/ a baud rate, and use that.
-    (serial-term (oref prefs port) 9600)
+    (serial-term (ede-arduino-port proj) 9600)
     ;; Always go to line mode, as arduino serial isn't typically used
     ;; for input, just debugging output.
     (term-line-mode)
@@ -272,6 +319,43 @@ Argument COMMAND is the command to use for compiling the target."
 		  libs)))
     (append (cons iphardware iplibs) fromconfig)))
 
+;;; Config File support
+;;
+;; Pull in configuration lines from config, or perhaps from the
+;; official preferences if the config file isn't empty.
+(defmethod ede-arduino-boardobj ((this ede-arduino-project))
+  "Fetch the board name to use for THIS project."
+  (let* ((config (ede-config-get-configuration this))
+	 (board (oref config board))
+	 (boardobj (oref config boardobj))
+	 (prefs (ede-arduino-sync)))
+
+    ;; Try the cache.
+    (if boardobj
+	boardobj
+
+      ;; No board cache in config yet.  Check if the user configured the
+      ;; board for this project.
+      (if (and (stringp board) (> (length board) 0))
+	  (progn
+	    (setq boardobj (ede-arduino-board-data board))
+	    (oset config boardobj boardobj)
+	    boardobj)
+
+	;; User never tried the config file, just provide the preferences.
+	(oref prefs boardobj)))))
+
+(defmethod ede-arduino-port ((this ede-arduino-project))
+  "Fetch the board name to use for THIS project."
+  (let* ((config (ede-config-get-configuration this))
+	 (port (oref config port))
+	 (prefs (ede-arduino-sync)))
+
+    (if (and (stringp port) (> (length port) 0))
+	port
+      ;; User never tried the config file, just provide the preferences.
+      (oref prefs port))))
+
 ;;; Makefile Creation
 ;;
 ;; Use SRecode, and the ede/srecode tool to build our Makefile.
@@ -287,7 +371,7 @@ Argument COMMAND is the command to use for compiling the target."
   (let* ((mfilename (expand-file-name ede-arduino-makefile-name
 				     (oref proj directory)))
 	 (prefs (ede-arduino-sync))
-	 (board (oref prefs boardobj))
+	 (board (ede-arduino-boardobj proj))
 	 (vers (ede-arduino-Arduino-Version))
 	 (sketch (ede-arduino-guess-sketch))
 	 (orig-buffer nil)
@@ -320,8 +404,8 @@ Argument COMMAND is the command to use for compiling the target."
 	 "ARDUINO_LIBS" (mapconcat 'identity (ede-arduino-guess-libs) " ")
 	 "MCU" (oref board mcu)
 	 "F_CPU" (oref board f_cpu)
-	 "PORT" (oref prefs port)
-	 "BOARD" (oref prefs board)
+	 "PORT" (ede-arduino-port proj)
+	 "BOARD" (oref board buildname)
 	 "AVRDUDE_ARD_BAUDRATE" (oref board speed)
 	 "AVRDUDE_ARD_PROGRAMMER" (oref board protocol)
 	 "ARDUINO_MK" (ede-arduino-Arduino.mk)
@@ -571,6 +655,10 @@ If LIBRARY is not provided as an argument, just return the library directory."
 	 :initform nil
 	 :documentation
 	 "The name of the arduino board represented by this object.")
+   (buildname :initarg :buildname
+	      :initform nil
+	      :documentation
+	      "The name of the arduino board used by the build system.")
    (protocol :initarg :protocol
 	     :initform nil
 	     :documentation
@@ -658,6 +746,7 @@ Data returned is the intputs needed for the Makefile."
 
     (ede-arduino-board boardname
 		       :name name
+		       :buildname boardname
 		       :protocol protocol
 		       :speed speed
 		       :maximum-size size
