@@ -83,7 +83,8 @@ and also want to save some extra level of configuration.")
 ;; needed for this project.
 ;;
 (defclass ede-project-with-config (ede-project)
-  ((config-file-basename
+  ((menu :initform nil)
+   (config-file-basename
     :initform "Config.ede"
     :allocation :class
     :type string
