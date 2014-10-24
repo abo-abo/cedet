@@ -100,13 +100,6 @@ Force the boardobj slot to be flushed."
 	  [ "Upload Project to Board" ede-arduino-upload ]
 	  [ "Serial Monitor" cedet-arduino-serial-monitor ]
 	  "--"
-	  [ "Edit Projectfile" ede-edit-file-target
-	    (ede-buffer-belongs-to-project-p) ]
-	  "--"
-	  [ "Update Version" ede-update-version ede-object ]
-	  [ "Version Control Status" ede-vc-project-directory ede-object ]
-	  "--"
-	  [ "Rescan Project Files" ede-rescan-toplevel t ]
 	  ))
    )
   "EDE Arduino project.")
@@ -686,17 +679,10 @@ If LIBRARY is not provided as an argument, just return the library directory."
    )
   "Class for containing key aspect of the arduino board.")
 
-(defun ede-arduino-board-data (boardname)
-  "Read in the data from baords.txt for BOARDNAME.
-Data returned is the intputs needed for the Makefile."
+(defun ede-arduino-allboard-buffer ()
+  "Create and a tmp buffer with all the arduino board files in it.
+Position cursor at pos 0, ready to be scanned."
   (let ((buff (get-buffer-create "*arduino boards*"))
-	(name nil)
-	(protocol nil)
-	(speed nil)
-	(size nil)
-	(mcu nil)
-	(f_cpu nil)
-	(core nil)
 	(boardfiles (ede-arduino-boards.txt))
 	)
 
@@ -704,7 +690,36 @@ Data returned is the intputs needed for the Makefile."
       (erase-buffer)
       (while boardfiles
 	(insert-file-contents (car boardfiles))
-	(setq boardfiles (cdr boardfiles)))
+	(setq boardfiles (cdr boardfiles))))
+    buff))
+
+(defun ede-arduino-allboard-names ()
+  "Return a list of all the board names supported on this system."
+  (let ((buff (ede-arduino-allboard-buffer))
+	(boards nil))
+
+    (with-current-buffer buff
+      (while (re-search-forward "^\\([a-z0-9]+\\).name=" nil t)
+	(push (match-string 1) boards))
+      )
+
+    (kill-buffer buff)
+    (nreverse boards)))
+
+(defun ede-arduino-board-data (boardname)
+  "Read in the data from baords.txt for BOARDNAME.
+Data returned is the intputs needed for the Makefile."
+  (let ((buff (ede-arduino-allboard-buffer))
+	(name nil)
+	(protocol nil)
+	(speed nil)
+	(size nil)
+	(mcu nil)
+	(f_cpu nil)
+	(core nil)
+	)
+
+    (with-current-buffer buff
 
       (goto-char (point-min))
       (when (not (re-search-forward (concat "^" boardname ".name=") nil t))
