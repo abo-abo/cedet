@@ -610,7 +610,11 @@ This is also where Arduino.mk will be found."
 
 (defun ede-arduino-Arduino.mk ()
   "Return the location of Arduino's makefile helper."
-  (expand-file-name "Arduino.mk" (ede-arduino-find-install)))
+  (let ((fn (expand-file-name "Arduino.mk" (ede-arduino-find-install))))
+    (unless (file-exists-p fn)
+      (error "Arduino.mk not found.
+\"arduino-mk\" package not installed, and is required by EDE generated arduino makefiles."))
+    fn))
 
 (defun ede-arduino-Arduino-Version ()
   "Return the version of the installed Arduino."
