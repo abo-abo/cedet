@@ -1,4 +1,4 @@
-;;; data-debug.el --- Datastructure Debugger
+;;; data-debug.el --- Data structure debugger
 
 ;; Copyright (C) 2007-2013 Free Software Foundation, Inc.
 

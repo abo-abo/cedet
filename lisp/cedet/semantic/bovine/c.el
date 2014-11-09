@@ -505,7 +505,7 @@ code to parse."
     (let ((eval-form (eval parsedtokelist)))
       (if (or (not eval-form)
               (and (numberp eval-form)
-                   (equal eval-form 0)));; ifdefline resulted in false
+                   (equal eval-form 0)));; ifdef line resulted in false
 
 	;; The if indicates to skip this preprocessor section
 	(let ((pt nil))
