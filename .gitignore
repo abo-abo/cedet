@@ -1,3 +1,4 @@
+*.el~
 cedet-1.*/
 contrib/wisent-*-wy.el
 lisp/cedet/semantic/grammar-wy.el
