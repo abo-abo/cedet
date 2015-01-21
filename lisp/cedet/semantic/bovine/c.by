@@ -114,7 +114,7 @@
 %token UNION "union"
 %put UNION summary "Union Type Declaration: union [name] { ... };"
 %token ENUM "enum"
-%put ENUM summary "Enumeration Type Declaration: enum [name] { ... };"
+%put ENUM summary "Enumeration Type Declaration: enum [name] [: type] { ... };"
 %token TYPEDEF "typedef"
 %put TYPEDEF summary "Arbitrary Type Declaration: typedef <typedeclaration> <name>;"
 %token CLASS "class"
@@ -416,6 +416,12 @@ opt-name
     ( "" )
   ;
 
+opt-enum-type
+  : COLON typeformbase
+    ( ,$2 )
+  | ;; EMPTY
+  ;
+
 typesimple
   : struct-or-class opt-class opt-name opt-template-specifier
     opt-class-parents semantic-list
@@ -434,9 +440,10 @@ typesimple
   | UNION opt-class opt-name unionparts
     (TYPE-TAG (car $3) $1 $4 nil
               :parent (car ,$2))
-  | ENUM opt-class opt-name enumparts
-    (TYPE-TAG (car $3) $1 $4 nil
-              :parent (car ,$2))
+  | ENUM opt-class opt-name opt-enum-type enumparts
+    (TYPE-TAG (car $3) $1 $5 nil
+              :parent (car ,$2)
+              :enum-type (car ,$4))
  ;; Klaus Berndl: a typedef can be a typeformbase with all this
  ;; declmods stuff.
   | TYPEDEF declmods typeformbase cv-declmods typedef-symbol-list
