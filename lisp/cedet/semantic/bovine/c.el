@@ -1341,7 +1341,6 @@ Optional argument STAR and REF indicate the number of * and & in the typedef."
 	    :constant-flag (if (member "const" declmods) t nil)
 	    :typemodifiers (delete "const" declmods)
 	    :parent (car (nth 2 tokenpart))
-	    :enum-type (nth 3 tokenpart)
 	    :destructor-flag (if (car (nth 3 tokenpart) ) t)
 	    :constructor-flag (if constructor t)
 	    :function-pointer fcnpointer
