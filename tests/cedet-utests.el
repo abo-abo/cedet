@@ -36,6 +36,7 @@
 (require 'cedet/semantic/lex-utest)
 (require 'cedet/semantic/lex-spp-utest)
 (require 'cedet/semantic/utest-parse)
+(require 'cedet/semantic/ert/test-c-parser)
 (require 'cedet/semantic/utest-c)
 (require 'cedet/semantic/ia-utest)
 (require 'cedet/semantic/utest-fw)
@@ -102,6 +103,7 @@
     ;;
     ("semantic: lex spp table write" . semantic-lex-spp-write-utest)
     ("semantic: multi-lang parsing" . semantic-utest-main)
+    ("semantic: C parser (ERT)" . semantic-c-parser-test-ert)
     ("semantic: C preprocessor" . semantic-utest-c)
     ("semantic: format tests" . semantic-fmt-utest)
     ("semantic: analyzer tests" . semantic-ia-utest)
