@@ -1,6 +1,6 @@
 ;;; cedet-utests.el --- Run all unit tests in the CEDET suite.
 
-;; Copyright (C) 2008, 2009, 2010, 2012, 2013, 2014 Eric M. Ludlam
+;; Copyright (C) 2008, 2009, 2010, 2012, 2013, 2014, 2015 Eric M. Ludlam
 
 ;; Author: Eric M. Ludlam <eric@siege-engine.com>
 
@@ -96,6 +96,7 @@
     ;; EDE
     ;;
     ("ede: project detection tests" . ede-detect-utest) ;; NOTE: must be before other EDE tests.
+    ("ede: project detect linux extra" . ede-detect-linux-utest)
     ("ede: security tests" . ede-security-utest)
 
     ;;
