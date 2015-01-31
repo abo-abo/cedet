@@ -35,6 +35,39 @@
   (require 'cl))
 
 ;;; Code:
+(when (and (= emacs-major-version 24)
+	   (< emacs-minor-version 3))
+
+  (require 'eieio-base)
+
+  (let ((default-directory
+	  (expand-file-name "../../etc/fallback-libraries"
+			    (file-name-directory load-file-name)))
+	(load-path (append '(".") load-path)))
+    (dolist (cur '("eieio-core" "eieio" "eieio-base"))
+      (load cur nil t))))
+
+(when (and (= emacs-major-version 24)
+	   (= emacs-minor-version 3))
+  (require 'eieio-base)
+  (defalias 'eieio-object-name-string 'object-name-string)
+  (defalias 'eieio-object-name 'object-name)
+  (defalias 'eieio-object-class 'object-class)
+  (defalias 'eieio--object-class 'object-class-fast)
+  (defalias 'eieio-object-class-name 'object-class-name)
+  (defalias 'eieio-object-name-string 'object-name-string)
+  (defalias 'eieio--object-num-slots 'object-num-slots)
+  (defalias 'eieio-object-set-name-string 'object-set-name-string)
+  (defalias 'eieio-class-name 'class-name)
+  (defalias 'eieio-class-parent 'class-parent)
+  (defalias 'eieio-class-parents 'class-parents)
+  (defalias 'eieio-class-parents-fast 'class-parents-fast)
+  (defalias 'eieio-class-children 'class-children)
+  (defalias 'eieio--class-num-slots 'class-num-slots)
+  (defalias 'eieio-class-precedence-list 'class-precedence-list)
+  (defalias 'eieio-class-children 'class-direct-subclasses)
+  (defalias 'eieio-class-parents 'class-direct-superclasses))
+
 
 (when (not (fboundp 'compare-strings))
 
