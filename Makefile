@@ -37,7 +37,7 @@ INSTALL-INFO=install-info
 INFO_FILES=$(shell $(FIND) $(CURDIR)/doc/texi -type f -name '*.info')
 INFODIR=$(CURDIR)/doc/info
 
-all: showversion clean-autoloads autoloads touch-makefiles compile info install-info
+all: showversion clean-autoloads touch-makefiles autoloads compile info install-info
 
 ebuild:
 	$(EMACS) -Q --batch -l cedet-build.el -f cedet-build
