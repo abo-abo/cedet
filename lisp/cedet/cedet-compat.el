@@ -35,8 +35,10 @@
   (require 'cl))
 
 ;;; Code:
-(when (and (= emacs-major-version 24)
-	   (< emacs-minor-version 3))
+
+;;; EIEIO
+
+(when (version< emacs-version "24.3")
 
   (require 'eieio-base)
 
@@ -68,6 +70,10 @@
   (defalias 'eieio-class-children 'class-direct-subclasses)
   (defalias 'eieio-class-parents 'class-direct-superclasses))
 
+;;; locate-dominating-file
+;;; Older Emacsen are missing the predicate feature.
+(when (version< emacs-version "24.3")
+  (load "../../etc/fallback-libraries/dominate.el"))
 
 (when (not (fboundp 'compare-strings))
 
