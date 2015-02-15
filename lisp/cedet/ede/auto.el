@@ -234,7 +234,7 @@ added.  Possible values are:
   ;; First, can we identify PROJAUTO as already in the list?  If so, replace.
   (let ((projlist ede-project-class-files)
 	(projname (oref projauto :name)))
-    (while (and projlist (not (string= (eieio-object-name-string (car projlist) :name) projname)))
+    (while (and projlist (not (string= (oref (car projlist) :name) projname)))
       (setq projlist (cdr projlist)))
 
     (if projlist
