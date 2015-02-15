@@ -110,21 +110,28 @@ OVERRIDE-CHECK to override cedet short-cicuit."
   ;; Get EIEIO built first for older Emacsen
   (when (version< emacs-version "24.3")
     (save-excursion
-      (let ((src "etc/fallback-libraries/eieio.el")
-	    (dst "etc/fallback-libraries/eieio.elc")
-	    (core "etc/fallback-libraries/eieio-core.el")
-	    (coredst "etc/fallback-libraries/eieio-core.elc"))
+      (let ((src "etc/fallback-libraries/eieio/eieio.el")
+	    (dst "etc/fallback-libraries/eieio/eieio.elc")
+	    (core "etc/fallback-libraries/eieio/eieio-core.el")
+	    (coredst "etc/fallback-libraries/eieio/eieio-core.elc")
+	    (base "etc/fallback-libraries/eieio/eieio-base.el")
+	    (basedst "etc/fallback-libraries/eieio/eieio-base.elc"))
 	(if (file-newer-than-file-p core coredst)
 	    (progn
 	      (byte-compile-file core)
-	      (cedet-build-msg "(core) done ..."))
-	  (cedet-build-msg "(core) not needed..."))
+	      (cedet-build-msg "(eieio-core) done ..."))
+	  (cedet-build-msg "(eieio-core) not needed..."))
 	(load-file coredst)
 	(if (file-newer-than-file-p src dst)
 	    (progn
 	      (byte-compile-file src)
 	      (cedet-build-msg "(eieio) done\n"))
-	  (cedet-build-msg "(eieio) not needed\n")))))
+	  (cedet-build-msg "(eieio) not needed\n"))
+	(if (file-newer-than-file-p base basedst)
+	    (progn
+	      (byte-compile-file base)
+	      (cedet-build-msg "(eieio-base) done\n"))
+	  (cedet-build-msg "(eieio-base) not needed\n")))))
 
   ;; Get core CEDET autoloads built...
   (cedet-build-msg "Step 2.2: CEDET Autoloads...")
