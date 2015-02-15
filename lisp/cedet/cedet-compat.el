@@ -43,7 +43,7 @@
   (require 'eieio-base)
 
   (let ((default-directory
-	  (expand-file-name "../../etc/fallback-libraries"
+	  (expand-file-name "../../etc/fallback-libraries/eieio"
 			    (file-name-directory load-file-name)))
 	(load-path (append '(".") load-path)))
     (dolist (cur '("eieio-core" "eieio" "eieio-base"))
@@ -73,7 +73,7 @@
 ;;; locate-dominating-file
 ;;; Older Emacsen are missing the predicate feature.
 (when (version< emacs-version "24.3")
-  (load "../../etc/fallback-libraries/dominate.el"))
+  (load "../../etc/fallback-libraries/dominate/dominate.el"))
 
 (when (not (fboundp 'compare-strings))
 
@@ -215,13 +215,6 @@ Return a coding system between BEGIN and END."
 	   (mapcar #'coding-system-name (coding-system-list)))
 	  :test #'eq :from-end t)))))
   )
-
-(when (and (= emacs-major-version 23)
-	   (= emacs-minor-version 1))
-  (message "Loading CEDET fallback autoload library.")
-  (require 'autoload
-	   (expand-file-name "../../etc/fallback-libraries/autoload.el"
-			     (file-name-directory load-file-name))))
 
 (provide 'cedet-compat)
 

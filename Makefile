@@ -57,7 +57,7 @@ ebuild:
 
 compile:
 ifdef FALLBACK_EIEIO
-	$(MAKE) -C etc/fallback-libraries -f Makefile.eieio
+	$(MAKE) -C etc/fallback-libraries/eieio -f Makefile.eieio
 endif
 	$(MAKE) -C lisp
 
@@ -94,7 +94,7 @@ clean-all: clean-autoloads
 	@echo Calling \"$(MAKE) clean\" in all projects.
 	@$(foreach proj,$(PROJECTS),echo "  > $(proj)";cd $(CURDIR)/$(proj) && $(MAKE) clean;)
 ifdef FALLBACK_EIEIO
-	$(MAKE) -C etc/fallback-libraries -f Makefile.eieio clean
+	$(MAKE) -C etc/fallback-libraries/eieio -f Makefile.eieio clean
 endif
 
 
