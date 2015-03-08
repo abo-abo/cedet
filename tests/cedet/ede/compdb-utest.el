@@ -57,6 +57,14 @@
   (file-name-as-directory
    (expand-file-name "src/compdb" (when load-file-name (file-name-directory load-file-name)))))
 
+(defvar ede-compdb-test-cmake-path
+  (executable-find "cmake")
+  "Set to the path for the cmake tool, or nil if not available")
+
+(defvar ede-compdb-test-ninja-path
+  (executable-find "ninja")
+  "Set to the path for the ninja tool, or nil if not available")
+
 (defun invoke-cmake (srcdir builddir &rest args)
   "Invoke cmake on SRCDIR to build into BUILDDIR with ARGS."
   (with-current-buffer (get-buffer-create "*ede-compdb-test*")
@@ -210,7 +218,7 @@ End of search list.
 
 (ert-deftest ede-compdb-open-file-parsed ()
   "Tests the parsing of source files in a project. We ensure it correctly locates all include files, amongst other things."
-  ;;:expected-result :passed ;; TODO failed if we can't locate cmake on the path
+  :expected-result (if ede-compdb-test-cmake-path :passed :failed)
   (with-cmake-build-directory builddir :generate-compdb
    (let* ((testdir ede-compdb-test-srcdir)
           (proj (ede-add-project-to-global-list
@@ -335,6 +343,7 @@ End of search list.
 
 (ert-deftest ede-compdb-compiler-include-path-cache ()
   "Tests that the compiler include paths are detected."
+  :expected-result (if ede-compdb-test-cmake-path :passed :failed)
   (with-cmake-build-directory builddir :generate-compdb
    (cl-letf
        ((ede-compdb-compiler-cache nil)
@@ -358,6 +367,7 @@ End of search list.
 
 (ert-deftest ede-compdb-multiple-configuration-directories ()
   "Tests that we can track multiple configuration directories. We create two projects, Debug and Release, and check that they can both build"
+  :expected-result (if ede-compdb-test-cmake-path :passed :failed)
   (with-temp-directory builddir
    (let ((dbgdir (file-name-as-directory (concat builddir "debug")))
          (reldir (file-name-as-directory (concat builddir "release")))
@@ -398,6 +408,7 @@ End of search list.
 
 (ert-deftest ede-compdb-autoload-project ()
   "Tests that we can autoload a project depending on the presence of a compilation database file"
+  :expected-result (if ede-compdb-test-cmake-path :passed :failed)
   (with-insource-build dir :generate-compdb
    (dolist (f '("main.cpp" "world/world.cpp"))
      (with-temp-file-buffer buf (expand-file-name f dir)
@@ -409,6 +420,7 @@ End of search list.
 
 (ert-deftest ede-compdb-flymake-init-test ()
   "Tests that `ede-compdb-flymake-init' works correctly."
+  :expected-result (if ede-compdb-test-cmake-path :passed :failed)
   (with-cmake-build-directory builddir :generate-compdb
    (cl-letf*
        (((symbol-function 'flymake-init-create-temp-buffer-copy) (lambda (f) "dummyfile.cpp"))
@@ -441,7 +453,7 @@ End of search list.
 
 (ert-deftest ede-compdb-ninja-autoload-project ()
   "Tests autoloading of ninja projects when rules.ninja files are discovered"
-  ;;:expected-result :passed ;; TODO failed if we can't locate ninja on the path
+  :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-test-ninja-path) :passed :failed)
   (with-insource-build dir :generate-ninja
    (dolist (f '("main.cpp" "world/world.cpp"))
      (with-temp-file-buffer buf (expand-file-name f dir)
@@ -453,7 +465,7 @@ End of search list.
 
 (ert-deftest ede-compdb-ninja-phony-targets ()
   "Tests that when we are using the ede-ninja-project type, the targets list is populated with phony targets"
-  ;;:expected-result :passed ;; TODO failed if we can't locate ninja on the path
+  :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-test-ninja-path) :passed :failed)
   (with-cmake-build-directory
    builddir :generate-ninja
    (let* ((proj (ede-ninja-project "TESTPROJ"
