@@ -62,7 +62,7 @@
   "Set to the path for the cmake tool, or nil if not available")
 
 (defvar ede-compdb-test-ninja-path
-  (executable-find "ninja")
+  (or (executable-find "ninja-build") (executable-find "ninja"))
   "Set to the path for the ninja tool, or nil if not available")
 
 (defun invoke-cmake (srcdir builddir &rest args)
@@ -86,16 +86,18 @@
 
 (defmacro with-temp-directory (dir &rest body)
   "Create DIR as a temporary directory and invoke BODY.  The temporary directory will be deleted on exit/error."
+  (declare (indent 1))
   `(let ((,dir (file-name-as-directory (make-temp-file "build-" t))))
-    (unwind-protect
-        ,@body
-      (progn
-        (delete-directory ,dir t)
-        (ede-flush-deleted-projects)))))
+     (unwind-protect
+         ,@body
+       (progn
+         (delete-directory ,dir t)
+         (ede-flush-deleted-projects)))))
 (def-edebug-spec with-temp-directory (sexp body))
 
 (defmacro with-temp-file-buffer (buf file &rest body)
   "Open a buffer with symbol BUF from FILE and ensure it is killed after BODY is evaluated."
+  (declare (indent 2))
   `(let ((,buf (find-file-noselect ,file)))
      (unwind-protect
          (with-current-buffer ,buf
@@ -105,6 +107,7 @@
 (def-edebug-spec with-temp-file-buffer (sexp form body))
 
 (defmacro with-cmake-build-directory (dir &rest body)
+  ;; TODO: indent?
   (let (cmake-args)
     ;; TODO: remove duplicate code here **
     (when (eq :generate-compdb (car body))
@@ -122,6 +125,7 @@
 
 (defmacro with-insource-build (dir &rest body)
   "Sets up a source tree in a temporary directory DIR for an in-source build"
+  ;; TODO: indent?
   (let (cmake-args)
     ;; TODO: remove duplicate code here **
     (when (eq :generate-compdb (car body))
@@ -137,31 +141,40 @@
                                                         (directory-file-name ede-compdb-test-srcdir)))))
       (invoke-cmake "." ,dir ,@cmake-args)
       ,@body
-     )))
+      )))
 (def-edebug-spec with-insource-build (sexp body))
+
+(defmacro with-temp-ede-project (proj def &rest body)
+  "Bind PROJ to DEF and add it to the global list temporarily."
+  (declare (indent 2))
+  `(let ((,proj (ede-add-project-to-global-list ,def)))
+     (unwind-protect
+         (progn ,@body)
+       (ede-delete-project-from-global-list ,proj))))
+(def-edebug-spec with-temp-ede-project (sexp body))
 
 ;;; ede-compdb-entry tests
 
 (ert-deftest ede-compdb-parse-command-line ()
   "Tests parsing of command lines"
-  (let* ((cmdline "g++ -Dfoo -Dbar=baz -Uqux -isystem =/opt/quxx/include -I/opt/local/include -Iincludes -include bar.hpp -imacros config.h -isystem/opt/foo/include --sysroot=/sysroot main.cpp")
-         (e (compdb-entry "foo.cpp" :directory "." :command-line cmdline))
-         ;; expected include dirs
-         (incdirs `("/sysroot/opt/quxx/include/" "/opt/local/include/" ,(expand-file-name "includes/") "/opt/foo/include/" ".")))
+  (cl-letf*
+      ((cmdline "g++ -Dfoo -Dbar=baz -Uqux -isystem =/opt/quxx/include -I/opt/local/include -Iincludes -include bar.hpp -imacros config.h -isystem/opt/foo/include --sysroot=/sysroot main.cpp")
+       (e (compdb-entry "foo.cpp" :directory "." :command-line cmdline))
+       ;; expected include dirs
+       (incdirs `("/sysroot/opt/quxx/include/" "/opt/local/include/" ,(expand-file-name "includes/") "/opt/foo/include/" "."))
+       ;; mock out ede-compdb-compiler-include-path
+       ((symbol-function 'ede-compdb-compiler-include-path) (lambda (comp dir) '("/opt/g++/include"))))
 
-    (cl-letf
-        (((symbol-function 'ede-compdb-compiler-include-path) (lambda (comp dir) '("/opt/g++/include"))))
+    (should (equal cmdline (get-command-line e)))
 
-      (should (equal cmdline (get-command-line e)))
+    (should (equal '(("foo") ("bar" . "baz")) (oref e defines)))
+    (should (equal '("qux") (oref e undefines)))
 
-      (should (equal '(("foo") ("bar" . "baz")) (oref e defines)))
-      (should (equal '("qux") (oref e undefines)))
-
-      (should (equal '("foo" "bar=baz") (get-defines e)))
-      (should (equal (append incdirs (list "/sysroot/opt/g++/include")) (get-include-path e)))
-      (should (equal incdirs (get-include-path e t)))
-      (should (equal (mapcar #'expand-file-name '("config.h" "bar.hpp")) (get-includes e)))
-      )))
+    (should (equal '("foo" "bar=baz") (get-defines e)))
+    (should (equal (append incdirs (list "/sysroot/opt/g++/include")) (get-include-path e)))
+    (should (equal incdirs (get-include-path e t)))
+    (should (equal (mapcar #'expand-file-name '("config.h" "bar.hpp")) (get-includes e)))
+    ))
 
 (ert-deftest ede-compdb-parse-compiler-includes ()
   "Tests discovery of compiler include paths"
@@ -194,181 +207,180 @@ End of search list.
 (ert-deftest ede-compdb-empty-build-dir ()
   "Tests that we can still open files when the build directory can't be located, or is empty"
   (with-temp-directory tmpdir
-   (let* ((srcdir ede-compdb-test-srcdir)
-          (proj (ede-add-project-to-global-list
-                 (ede-compdb-project "TESTPROJ"
-                                     :compdb-file (expand-file-name "compile_commands.json" tmpdir)
-                                     :file (expand-file-name "CMakeLists.txt" srcdir))))
-          (maincpp (expand-file-name "main.cpp" srcdir)))
+    (with-temp-ede-project
+        proj (ede-compdb-project "TESTPROJ"
+                                 :compdb-file (expand-file-name "compile_commands.json" tmpdir)
+                                 :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))
 
-     (should (eq proj (ede-directory-get-open-project srcdir)))
+      (should (eq proj (ede-directory-get-open-project ede-compdb-test-srcdir)))
 
-     (let ((buf (find-file-noselect maincpp)))
-       (unwind-protect
-           (with-current-buffer buf
-             ;; Should have set up the current project and target
-             (should (eq proj (ede-current-project)))
-             (should (not (oref ede-object compilation)))
+      (with-temp-file-buffer buf (expand-file-name "main.cpp" ede-compdb-test-srcdir)
+        ;; Should have set up the current project and target
+        (should (eq proj (ede-current-project)))
+        (should (not (oref ede-object compilation)))
 
-             ;; Should have been parsed
-             (should (semantic-active-p))
-             )
-         (kill-buffer buf)))
-     )))
+        ;; Should have been parsed
+        (should (semantic-active-p))
+        ))))
 
 (ert-deftest ede-compdb-open-file-parsed ()
   "Tests the parsing of source files in a project. We ensure it correctly locates all include files, amongst other things."
   :expected-result (if ede-compdb-test-cmake-path :passed :failed)
-  (with-cmake-build-directory builddir :generate-compdb
+  (with-cmake-build-directory
+   builddir :generate-compdb
    (let* ((testdir ede-compdb-test-srcdir)
-          (proj (ede-add-project-to-global-list
-                 (ede-compdb-project "TESTPROJ"
-                                     :compdb-file (expand-file-name "compile_commands.json" builddir)
-                                     :file (expand-file-name "CMakeLists.txt" testdir))))
           (maincpp (expand-file-name "main.cpp" testdir))
           (worldcpp (expand-file-name "world/world.cpp" testdir))
           (utilityhpp (expand-file-name "utility/utility.hpp" testdir))
           (testbufs))
 
-     ;; Basic sanity checks on the project itself
-     (should (eq proj (ede-directory-get-open-project testdir)))
-     (should (gethash (file-truename maincpp) (oref proj compdb)))
+     (with-temp-ede-project
+      proj (ede-compdb-project "TESTPROJ"
+                               :compdb-file (expand-file-name "compile_commands.json" builddir)
+                               :file (expand-file-name "CMakeLists.txt" testdir))
 
-     ;; Now we'll open source files and check that they are parsed correctly
-     (unwind-protect
-         (progn
-           (let ((buf (find-file-noselect maincpp)))
-             (setq testbufs (cons buf testbufs))
-             (with-current-buffer buf
-               ;; Should have set up the current project and target
-               (should ede-object)
-               (should (eq proj (ede-current-project)))
-               (should (oref ede-object compilation))
+      ;; Basic sanity checks on the project itself
+      (should (eq proj (ede-directory-get-open-project testdir)))
+      (should (gethash (file-truename maincpp) (oref proj compdb)))
 
-               ;; Include path should include certain dirs:
-               (let ((P (ede-system-include-path ede-object)))
-                 (should (member (file-name-as-directory (expand-file-name "world" testdir)) P))
-                 (should (or (member builddir P) (member (file-truename builddir) P)))
-                 )
+      ;; Now we'll open source files and check that they are parsed correctly
+      (unwind-protect
+          (progn
+            (let ((buf (find-file-noselect maincpp)))
+              (setq testbufs (cons buf testbufs))
+              (with-current-buffer buf
+                ;; Should have set up the current project and target
+                (should ede-object)
+                (should (eq proj (ede-current-project)))
+                (should (oref ede-object compilation))
 
-               ;; Should have been parsed
-               (should (semantic-active-p))
-               (should (not semantic-parser-warnings))
+                ;; Include path should include certain dirs:
+                (let ((P (ede-system-include-path ede-object)))
+                  (should (member (file-name-as-directory (expand-file-name "world" testdir)) P))
+                  (should (or (member builddir P) (member (file-truename builddir) P)))
+                  )
 
-               (let* ((tags (semantic-fetch-tags))
-                      (includes (semantic-find-tags-included tags))
-                      (funcs (semantic-find-tags-by-class 'function tags)))
-                 ;; All includes should be parsed
-                 (should includes)
-                 (dolist (inc includes)
-                   (should (semantic-dependency-tag-file inc)))
+                ;; Should have been parsed
+                (should (semantic-active-p))
+                (should (not semantic-parser-warnings))
 
-                 ;; These function names are defined using macros, so shouldn't be visible unless we
-                 ;; have parsed the preprocessor map correctly
-                 ;; (should (semantic-find-tags-by-name "HelloFoo" funcs))
-                 ;; (should (semantic-find-tags-by-name "HelloBar" funcs))
-                 ;; (should (semantic-find-tags-by-name "HelloBaz" funcs))
-                 )
-               ))
+                (let* ((tags (semantic-fetch-tags))
+                       (includes (semantic-find-tags-included tags))
+                       (funcs (semantic-find-tags-by-class 'function tags)))
+                  ;; All includes should be parsed
+                  (should includes)
+                  (dolist (inc includes)
+                    (should (semantic-dependency-tag-file inc)))
 
-           ;; All of the world.[chi]pp files should also be parsed
-           (dolist (EXT '(".cpp" ".hpp" ".ipp"))
-             (let* ((filepath (expand-file-name (concat "world/world" EXT) testdir))
-                    (buf (find-file-noselect filepath)))
-               (setq testbufs (cons buf testbufs))
-               (with-current-buffer buf
-                 (should (eq proj (ede-current-project)))
-                 (should (semantic-active-p))
-                 (should (not semantic-parser-warnings))
+                  ;; These function names are defined using macros, so shouldn't be visible unless we
+                  ;; have parsed the preprocessor map correctly
+                  ;; (should (semantic-find-tags-by-name "HelloFoo" funcs))
+                  ;; (should (semantic-find-tags-by-name "HelloBar" funcs))
+                  ;; (should (semantic-find-tags-by-name "HelloBaz" funcs))
+                  )
+                ))
 
-                 ;; Compilation should be pointed to world.cpp
-                 (should (eq (oref ede-object compilation)
-                             (gethash (file-truename worldcpp) (oref proj compdb))))
-                 )))
+            ;; All of the world.[chi]pp files should also be parsed
+            (dolist (EXT '(".cpp" ".hpp" ".ipp"))
+              (let* ((filepath (expand-file-name (concat "world/world" EXT) testdir))
+                     (buf (find-file-noselect filepath)))
+                (setq testbufs (cons buf testbufs))
+                (with-current-buffer buf
+                  (should (eq proj (ede-current-project)))
+                  (should (semantic-active-p))
+                  (should (not semantic-parser-warnings))
 
-           ;; Try a header with no matching source file
-           (let ((buf (find-file-noselect utilityhpp)))
-             (setq testbufs (cons buf testbufs))
-             (with-current-buffer buf
-               (should (eq proj (ede-current-project)))
-               (should (semantic-active-p))
-               (should (not semantic-parser-warnings))
+                  ;; Compilation should be pointed to world.cpp
+                  (should (eq (oref ede-object compilation)
+                              (gethash (file-truename worldcpp) (oref proj compdb))))
+                  )))
 
-               ;; Compilation should be pointed to main.cpp
-               (should (eq (oref ede-object compilation)
-                           (gethash (file-truename maincpp) (oref proj compdb))))
-               ))
+            ;; Try a header with no matching source file
+            (let ((buf (find-file-noselect utilityhpp)))
+              (setq testbufs (cons buf testbufs))
+              (with-current-buffer buf
+                (should (eq proj (ede-current-project)))
+                (should (semantic-active-p))
+                (should (not semantic-parser-warnings))
 
-           ;; Try a generated source file
-           (let ((buf (find-file-noselect (expand-file-name "build_type.cpp" builddir))))
-             (setq testbufs (cons buf testbufs))
-             (with-current-buffer buf
-               ;; FIXME: Should have set up the current project and target with compilation
-               ;; (should (eq proj (ede-current-project)))
-               ;; (should (oref ede-object compilation))
+                ;; Compilation should be pointed to main.cpp
+                (should (eq (oref ede-object compilation)
+                            (gethash (file-truename maincpp) (oref proj compdb))))
+                ))
 
-               ;; FIXME: should have been parsed
-               ;; (should (semantic-active-p))
-               ;; (should (not semantic-parser-warnings))
-               ))
+            ;; Try a generated source file
+            (let ((buf (find-file-noselect (expand-file-name "build_type.cpp" builddir))))
+              (setq testbufs (cons buf testbufs))
+              (with-current-buffer buf
+                ;; FIXME: Should have set up the current project and target with compilation
+                ;; (should (eq proj (ede-current-project)))
+                ;; (should (oref ede-object compilation))
 
-           ;; Force a rescan with all these buffers open, just to make sure it works
-           (with-current-buffer (car testbufs)
-             (let (hookrun)
+                ;; FIXME: should have been parsed
+                ;; (should (semantic-active-p))
+                ;; (should (not semantic-parser-warnings))
+                ))
 
-               ;; Add a local hook so it will go away when we close the buffer
-               (add-hook 'ede-compdb-project-rescan-hook (lambda () (setq hookrun t)) nil t)
+            ;; Force a rescan with all these buffers open, just to make sure it works
+            (with-current-buffer (car testbufs)
+              (let (hookrun)
 
-               (ede-rescan-toplevel)
+                ;; Add a local hook so it will go away when we close the buffer
+                (add-hook 'ede-compdb-project-rescan-hook (lambda () (setq hookrun t)) nil t)
 
-               ;; Check that the rescan hook is run
-               (should hookrun)))
+                (ede-rescan-toplevel)
 
-           ;; All compilation entries should have been updated
-           ;; FIXME: need ede-object for all buffers, including above
-           (with-current-buffer (get-file-buffer maincpp)
-             ;; Check that compilation entry has been updated
-             (should (eq (oref ede-object compilation)
-                         (gethash (file-truename buffer-file-name) (oref proj compdb)))))
+                ;; Check that the rescan hook is run
+                (should hookrun)))
 
-           ;; Close all buffers and check we can still rescan
-           (while testbufs
-             (kill-buffer (pop testbufs)))
-           (project-rescan proj)
+            ;; All compilation entries should have been updated
+            ;; FIXME: need ede-object for all buffers, including above
+            (with-current-buffer (get-file-buffer maincpp)
+              ;; Check that compilation entry has been updated
+              (should (eq (oref ede-object compilation)
+                          (gethash (file-truename buffer-file-name) (oref proj compdb)))))
 
-           )
-       (while testbufs
-         (kill-buffer (pop testbufs)))
-       ))))
+            ;; Close all buffers and check we can still rescan
+            (while testbufs
+              (kill-buffer (pop testbufs)))
+            (project-rescan proj)
+
+            )
+        (while testbufs
+          (kill-buffer (pop testbufs)))
+        )))))
 
 (ert-deftest ede-compdb-compiler-include-path-cache ()
   "Tests that the compiler include paths are detected."
   :expected-result (if ede-compdb-test-cmake-path :passed :failed)
-  (with-cmake-build-directory builddir :generate-compdb
+  (with-cmake-build-directory
+   builddir :generate-compdb
    (cl-letf
-       ((ede-compdb-compiler-cache nil)
-        (proj (ede-add-project-to-global-list
-               (ede-compdb-project "TESTPROJ"
-                                   :compdb-file (expand-file-name "compile_commands.json" builddir)
-                                   :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir)))))
+       ((ede-compdb-compiler-cache nil))
 
-     (should (listp ede-compdb-compiler-cache))
-     ;; Check that compiler includes are present in the project includes
-     (when (car ede-compdb-compiler-cache)
-       (let* ((maincpp (expand-file-name "main.cpp" testdir))
-              (buf (find-file-noselect maincpp)))
-         (unwind-protect
-             (let* ((target (ede-find-target proj buf))
-                    (entry (oref target compilation))
-                    (compiler (oref entry compiler)))
-               (should (memq (cdr (assoc compiler ede-compdb-compiler-cache)) (oref entry include-path))))
-           (kill-buffer buf))))
-             )))
+     (with-temp-ede-project
+      proj (ede-compdb-project "TESTPROJ"
+                               :compdb-file (expand-file-name "compile_commands.json" builddir)
+                               :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))
+
+      (should (listp ede-compdb-compiler-cache))
+      ;; Check that compiler includes are present in the project includes
+      (when (car ede-compdb-compiler-cache)
+        (let* ((maincpp (expand-file-name "main.cpp" testdir))
+               (buf (find-file-noselect maincpp)))
+          (unwind-protect
+              (let* ((target (ede-find-target proj buf))
+                     (entry (oref target compilation))
+                     (compiler (oref entry compiler)))
+                (should (memq (cdr (assoc compiler ede-compdb-compiler-cache)) (oref entry include-path))))
+            (kill-buffer buf))))
+      ))))
 
 (ert-deftest ede-compdb-multiple-configuration-directories ()
   "Tests that we can track multiple configuration directories. We create two projects, Debug and Release, and check that they can both build"
   :expected-result (if ede-compdb-test-cmake-path :passed :failed)
-  (with-temp-directory builddir
+  (with-temp-directory
+   builddir
    (let ((dbgdir (file-name-as-directory (concat builddir "debug")))
          (reldir (file-name-as-directory (concat builddir "release")))
          (custdir (file-name-as-directory (concat builddir "custom"))))
@@ -409,58 +421,65 @@ End of search list.
 (ert-deftest ede-compdb-autoload-project ()
   "Tests that we can autoload a project depending on the presence of a compilation database file"
   :expected-result (if ede-compdb-test-cmake-path :passed :failed)
-  (with-insource-build dir :generate-compdb
+  (with-insource-build
+   dir :generate-compdb
    (dolist (f '("main.cpp" "world/world.cpp"))
      (with-temp-file-buffer buf (expand-file-name f dir)
-      ;; Should have set up the current project and target
-      (should (ede-current-project))
-      (should ede-object)
-      (should (oref ede-object compilation)))
+       ;; Should have set up the current project and target
+       (should (ede-current-project))
+       (should ede-object)
+       (should (oref ede-object compilation)))
      )))
 
 (ert-deftest ede-compdb-flymake-init-test ()
   "Tests that `ede-compdb-flymake-init' works correctly."
   :expected-result (if ede-compdb-test-cmake-path :passed :failed)
-  (with-cmake-build-directory builddir :generate-compdb
+  (with-cmake-build-directory
+   builddir :generate-compdb
+   (require 'flymake)
    (cl-letf*
        (((symbol-function 'flymake-init-create-temp-buffer-copy) (lambda (f) "dummyfile.cpp"))
-        (proj (ede-add-project-to-global-list
-               (ede-compdb-project "TESTPROJ"
-                                   :compdb-file (expand-file-name "compile_commands.json" builddir)
-                                   :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))))
         (maincpp (expand-file-name "main.cpp" ede-compdb-test-srcdir)))
-     (with-temp-file-buffer buf maincpp
-      ;; Should have set up the current project and target
-      (should (eq proj (ede-current-project)))
-      (should (oref ede-object compilation))
 
-      (let ((ret (ede-compdb-flymake-init)))
-        ;; Init function needs to return a list of (compiler, args, dir)
-        (should (listp ret))
-        (should (= 3 (length ret)))
+     (with-temp-ede-project
+      proj (ede-compdb-project "TESTPROJ"
+                               :compdb-file (expand-file-name "compile_commands.json" builddir)
+                               :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))
 
-        ;; Args should be processed correctly
-        (should (cl-search '("-o" "/dev/null") (nth 1 ret) :test 'equal))
-        (should (not (cl-find "-MT" (nth 1 ret) :test 'equal)))
-        (should (not (cl-find maincpp (nth 1 ret) :test 'equal)))
-        (should (not (cl-find "-c" (nth 1 ret) :test 'equal)))
+      (with-temp-file-buffer buf maincpp
 
-        ;; Directory should be the build dir
-        (should (file-equal-p builddir (nth 2 ret)))
-        )))))
+        ;; Should have set up the current project and target
+        (should (eq proj (ede-current-project)))
+        (should (oref ede-object compilation))
+
+        (let ((ret (ede-compdb-flymake-init)))
+          ;; Init function needs to return a list of (compiler, args, dir)
+          (should (listp ret))
+          (should (= 3 (length ret)))
+
+          ;; Args should be processed correctly
+          (should (cl-search '("-o" "/dev/null") (nth 1 ret) :test 'equal))
+          (should (not (cl-find "-MT" (nth 1 ret) :test 'equal)))
+          (should (not (cl-find maincpp (nth 1 ret) :test 'equal)))
+          (should (not (cl-find "-c" (nth 1 ret) :test 'equal)))
+
+          ;; Directory should be the build dir
+          (should (file-equal-p builddir (nth 2 ret)))
+          ))))))
 
 ;;; ede-ninja-project tests
 
 (ert-deftest ede-compdb-ninja-autoload-project ()
   "Tests autoloading of ninja projects when rules.ninja files are discovered"
   :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-test-ninja-path) :passed :failed)
-  (with-insource-build dir :generate-ninja
+  (with-insource-build
+   dir :generate-ninja
    (dolist (f '("main.cpp" "world/world.cpp"))
      (with-temp-file-buffer buf (expand-file-name f dir)
-      ;; Should have set up the current project and target
-      (should (ede-current-project))
-      (should ede-object)
-      (should (oref ede-object compilation)))
+       ;; Should have set up the current project and target
+       (should (ede-current-project))
+       (should ede-object)
+       (should (oref ede-object compilation)))
      )))
 
 (ert-deftest ede-compdb-ninja-phony-targets ()
@@ -468,9 +487,10 @@ End of search list.
   :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-test-ninja-path) :passed :failed)
   (with-cmake-build-directory
    builddir :generate-ninja
-   (let* ((proj (ede-ninja-project "TESTPROJ"
-                                   :compdb-file (expand-file-name "build.ninja" builddir)
-                                   :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))))
+   (with-temp-ede-project
+       proj (ede-ninja-project "TESTPROJ"
+                               :compdb-file (expand-file-name "build.ninja" builddir)
+                               :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))
 
      (project-compile-project proj)
      (sleep-until-compilation-done)

@@ -1,4 +1,4 @@
-;;; ede-compdb.el --- Support for compilation database projects in EDE
+;;; compdb.el --- Support for compilation database projects in EDE
 
 ;; Copyright (C) 2013-2014 Alastair Rankine
 
@@ -713,15 +713,13 @@ into the current buffer. COMPDB-PATH represents the current path
 to :compdb-file"
   (message "Building compilation database...")
   (let ((default-directory (file-name-directory compdb-path)))
-    (apply 'call-process (append `("ninja" nil t nil "-f" ,(oref this compdb-file) "-t" "compdb") (oref this :build-rules)))))
+    (apply 'call-process `("ninja" nil t nil "-f" ,(oref this compdb-file) "-t" "compdb" ,@(oref this :build-rules)))))
 
 (defmethod project-interactive-select-target ((this ede-ninja-project) prompt)
   "Interactively query for a target. Argument PROMPT is the prompt to use."
   (let ((tname (completing-read prompt (oref this phony-targets) nil nil nil 'ede-ninja-target-history)))
     ;; Create a new target and return it - doesn't matter that it's not in :targets list...
     (ede-compdb-target tname :name tname :project this)))
-
-(provide 'ede/compdb)
 
 ;;; Utility functions:
 
@@ -768,4 +766,5 @@ file found."
         (nreverse ret)
         ))))
 
+(provide 'ede/compdb)
 ;;; ede-compdb.el ends here
