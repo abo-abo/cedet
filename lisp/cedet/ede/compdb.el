@@ -78,6 +78,13 @@
                        :load-type 'ede-ninja-load-project
                        :class-sym 'ede-ninja-project))
 
+;;; Custom variables:
+
+(defcustom ede-compdb-ninja-exe-path
+  (or (executable-find "ninja-build") (executable-find "ninja"))
+  "Path to ninja build tool executable, used for ninja build projects."
+  :group 'ede
+  :type 'file)
 
 ;;; Classes:
 
@@ -122,7 +129,7 @@
     :type (or list string) :initarg :configuration-directories
     :documentation "For each configuration, a directory in which to locate the configuration database file. This is evaluated relative to :directory")
    (build-command
-    :type string :initarg :build-command :initform "make -k"
+    :type (or string symbol) :initarg :build-command :initform "make -k"
     :documentation "A shell command to build the entire project. Invoked from the configuration directory.")
 
    (compdb
@@ -141,7 +148,7 @@
 (defclass ede-ninja-project (ede-compdb-project)
   (
    (build-command
-    :type string :initarg :build-command :initform "ninja"
+    :type (or string symbol) :initarg :build-command :initform ede-compdb-ninja-exe-path
     :documentation "A shell command to build the entire project. Invoked from the configuration directory.")
    (phony-targets
     :type list :initform '()
@@ -431,6 +438,14 @@ If EXCLUDECOMPILER is t, we ignore compiler include paths"
 
 ;;; ede-compdb-project methods:
 
+(defmethod get-build-command ((this ede-compdb-project))
+  "Returns the build command for THIS project.  If the
+build-command slot is set to a symbol, the symbol is evaluated."
+  (let ((cmd (oref this :build-command)))
+    (if (symbolp cmd)
+        (symbol-value cmd)
+      cmd)))
+
 (defmethod current-configuration-directory-path ((this ede-compdb-project) &optional config)
   "Returns the path to the configuration directory for CONFIG, or for :configuration-default if CONFIG not set"
   (let ((dir (nth (cl-position (or config (oref this configuration-default)) (oref this configurations) :test 'equal)
@@ -660,7 +675,7 @@ of `ede-compdb-target' or a string."
   (let* ((entry (when (and (ede-compdb-target-p target) (slot-boundp target :compilation))
                   (oref target compilation)))
          (cmd (if entry (get-command-line entry)
-                (concat (oref this build-command) " "
+                (concat (get-build-command this) " "
                         (if (ede-compdb-target-p target) (oref target name) target))))
          (default-directory (if entry (oref entry directory)
                               (current-configuration-directory this))))
@@ -670,7 +685,7 @@ of `ede-compdb-target' or a string."
 (defmethod project-compile-project ((this ede-compdb-project))
   "Build the project THIS using :build-command"
   (let ((default-directory (current-configuration-directory this)))
-    (compile (oref this build-command))
+    (compile (get-build-command this))
     ))
 
 (defmethod ede-menu-items-build ((_this ede-compdb-project) &optional _current)
@@ -684,7 +699,7 @@ of `ede-compdb-target' or a string."
   (interactive "DConfiguration Directory: ")
   (set-configuration-directory (or proj (ede-current-project)) dir config))
 
-;;; ede-compdb-project methods:
+;;; ede-ninja-project methods:
 
 (defvar ede-ninja-target-regexp "^\\(.+\\): \\(phony\\|CLEAN\\)$"
   "Regexp to identify phony targets in the output of ninja -t targets.")
@@ -696,7 +711,7 @@ of `ede-compdb-target' or a string."
     (let ((default-directory (current-configuration-directory this)))
       (oset this phony-targets nil)
       (erase-buffer)
-      (call-process "ninja" nil t t "-f" (oref this compdb-file) "-t" "targets" "all")
+      (call-process (get-build-command this) nil t t "-f" (oref this compdb-file) "-t" "targets" "all")
       (let ((progress-reporter (make-progress-reporter "Scanning targets..." (point-min) (point-max))))
         (goto-char 0)
         (while (re-search-forward ede-ninja-target-regexp nil t)
@@ -713,7 +728,7 @@ into the current buffer. COMPDB-PATH represents the current path
 to :compdb-file"
   (message "Building compilation database...")
   (let ((default-directory (file-name-directory compdb-path)))
-    (apply 'call-process `("ninja" nil t nil "-f" ,(oref this compdb-file) "-t" "compdb" ,@(oref this :build-rules)))))
+    (apply 'call-process `(,(get-build-command this) nil t nil "-f" ,(oref this compdb-file) "-t" "compdb" ,@(oref this :build-rules)))))
 
 (defmethod project-interactive-select-target ((this ede-ninja-project) prompt)
   "Interactively query for a target. Argument PROMPT is the prompt to use."

@@ -27,10 +27,10 @@
 
 ;;; Code:
 
-;(require 'ede/compdb)
 (require 'ert)
 (require 'semantic)
 (require 'cl-lib)
+(require 'ede/compdb)
 
 ;; Need to have EDE and semantic automatically enabled for new buffers
 ;(semantic-mode t)
@@ -60,10 +60,6 @@
 (defvar ede-compdb-test-cmake-path
   (executable-find "cmake")
   "Set to the path for the cmake tool, or nil if not available")
-
-(defvar ede-compdb-test-ninja-path
-  (or (executable-find "ninja-build") (executable-find "ninja"))
-  "Set to the path for the ninja tool, or nil if not available")
 
 (defun invoke-cmake (srcdir builddir &rest args)
   "Invoke cmake on SRCDIR to build into BUILDDIR with ARGS."
@@ -471,7 +467,7 @@ End of search list.
 
 (ert-deftest ede-compdb-ninja-autoload-project ()
   "Tests autoloading of ninja projects when rules.ninja files are discovered"
-  :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-test-ninja-path) :passed :failed)
+  :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-ninja-exe-path) :passed :failed)
   (with-insource-build
    dir :generate-ninja
    (dolist (f '("main.cpp" "world/world.cpp"))
@@ -484,7 +480,7 @@ End of search list.
 
 (ert-deftest ede-compdb-ninja-phony-targets ()
   "Tests that when we are using the ede-ninja-project type, the targets list is populated with phony targets"
-  :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-test-ninja-path) :passed :failed)
+  :expected-result (if (and ede-compdb-test-cmake-path ede-compdb-ninja-exe-path) :passed :failed)
   (with-cmake-build-directory
    builddir :generate-ninja
    (with-temp-ede-project
