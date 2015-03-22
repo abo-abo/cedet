@@ -307,12 +307,12 @@ from the command line (which is most of them!)"
     (when (slot-boundp this :sysroot)
       (let ((rep (concat (regexp-quote (oref this sysroot)) "\\1")))
         (cl-maplist
-         (lambda (d) (setcar d (replace-regexp-in-string ede-compdb-entry-sysroot-directory-rx rep (car d))))
+         #'(lambda (d) (setcar d (replace-regexp-in-string ede-compdb-entry-sysroot-directory-rx rep (car d))))
          (oref this include-path))))
 
     ;; Evaluate relative directories in include-path
     (cl-maplist
-     (lambda (d) (setcar d (file-name-as-directory (expand-file-name (car d) (oref this directory)))))
+     #'(lambda (d) (setcar d (file-name-as-directory (expand-file-name (car d) (oref this directory)))))
      (oref this include-path))
     ))
 
@@ -321,9 +321,9 @@ from the command line (which is most of them!)"
   (parse-command-line-if-needed this)
   (mapcar
    ;; Convert ("SYM" . "DEF") into "SYM=DEF"
-   (lambda (def) (if (cdr def)
-                     (concat (car def) "=" (cdr def))
-                   (car def)))
+   #'(lambda (def) (if (cdr def)
+                       (concat (car def) "=" (cdr def))
+                     (car def)))
    (oref this defines)))
 
 (defmethod get-include-path ((this compdb-entry) &optional excludecompiler)
@@ -336,15 +336,15 @@ If EXCLUDECOMPILER is t, we ignore compiler include paths"
    (unless excludecompiler
      (let ((path (ede-compdb-compiler-include-path (oref this compiler) (oref this directory))))
        (if (slot-boundp this :sysroot)
-           (mapcar (lambda (d) (concat (directory-file-name (oref this sysroot)) d)) path)
+           (mapcar #'(lambda (d) (concat (directory-file-name (oref this sysroot)) d)) path)
          path)))
    ))
 
 (defmethod get-includes ((this compdb-entry))
   "Get the include files used by THIS compdb entry. Relative paths are resolved."
   (parse-command-line-if-needed this)
-  (mapcar (lambda (I)
-            (expand-file-name I (oref this directory)))
+  (mapcar #'(lambda (I)
+              (expand-file-name I (oref this directory)))
           (oref this includes)))
 
 ;;; ede-compdb-target methods:
@@ -367,26 +367,26 @@ If EXCLUDECOMPILER is t, we ignore compiler include paths"
       (require 'semantic/db)
       (let ((spp (oref comp defines)))
         (mapc
-         (lambda (F)
-           (let* ((expfile (expand-file-name F (oref comp directory)))
-                  (table (when expfile
-                           ;; Disable EDE init on preprocessor file load
-                           ;; otherwise we recurse, cause errs, etc.
-                           (let ((ede-constructing t))
-                             (semanticdb-file-table-object expfile))))
-                  )
-             (cond
-              ((not (file-exists-p expfile))
-               (message "Cannot find file %s in project." F))
-              ((string= expfile (buffer-file-name))
-               ;; Don't include this file in it's own spp table.
-               )
-              ((not table)
-               (message "No db table available for %s." expfile))
-              (t
-               (when (semanticdb-needs-refresh-p table)
-                 (semanticdb-refresh-table table))
-               (setq spp (append spp (oref table lexical-table)))))))
+         #'(lambda (F)
+             (let* ((expfile (expand-file-name F (oref comp directory)))
+                    (table (when expfile
+                             ;; Disable EDE init on preprocessor file load
+                             ;; otherwise we recurse, cause errs, etc.
+                             (let ((ede-constructing t))
+                               (semanticdb-file-table-object expfile))))
+                    )
+               (cond
+                ((not (file-exists-p expfile))
+                 (message "Cannot find file %s in project." F))
+                ((string= expfile (buffer-file-name))
+                 ;; Don't include this file in it's own spp table.
+                 )
+                ((not table)
+                 (message "No db table available for %s." expfile))
+                (t
+                 (when (semanticdb-needs-refresh-p table)
+                   (semanticdb-refresh-table table))
+                 (setq spp (append spp (oref table lexical-table)))))))
          (oref (oref this compilation) includes))
         spp))))
 
@@ -397,49 +397,6 @@ If EXCLUDECOMPILER is t, we ignore compiler include paths"
 (defmethod ede-project-root ((this ede-compdb-target))
   "Returns the root project for target THIS."
   (oref this project))
-
-(defun ede-object-system-include-path ()
-  "Return the system include path for the current buffer."
-  (when ede-object
-    (ede-system-include-path ede-object)))
-
-(defun ede-compdb-flymake-init ()
-  "Init function suitable for use with function `flymake-mode'."
-  (when (and ede-object (slot-boundp ede-object :compilation) (oref ede-object :compilation))
-    (let* ((comp (oref ede-object compilation))
-           (args (split-string (get-command-line comp)))
-           (temp-file (flymake-init-create-temp-buffer-copy
-                       'flymake-create-temp-inplace))
-           ret)
-      ;; Process args, building up a new list as we go. Each new element is added to the head of the
-      ;; list, so we need to reverse it once done
-      (while args
-        (let ((argi (pop args)))
-          (cond
-            ;; substitude /dev/null for the output file
-           ((equal argi "-o")
-            (setq ret (cons "/dev/null" (cons argi ret)))
-            (pop args))
-
-            ;; substitute -S for -c (ie just compile, don't assemble)
-           ((equal argi "-c")
-            (setq ret (cons "-S" ret)))
-
-           ;; Don't do any makefile generation
-           ((member argi '("-M" "-MM" "-MMD" "-MG" "-MP" "-MD")))
-           ((member argi '("-MF" "-MT" "-MQ"))
-            (pop args))
-
-            ;; substitute temp-file for the input file
-           ((file-equal-p (expand-file-name argi (oref comp directory)) buffer-file-name)
-            (setq ret (cons temp-file ret)))
-           (t
-            (setq ret (cons argi ret)))
-           )))
-      (setq ret (reverse ret))
-      (list (pop ret) ret (oref comp directory))
-      )))
-
 
 ;;; ede-compdb-project methods:
 
@@ -509,12 +466,12 @@ an d pick one that is present in the compdb hashtable."
      ;; Otherwise search the compilation database for the 'best' match. In this
      ;; case the best match is the one with the longest matching prefix.
      (let (bestmatch bestmatchlen)
-       (maphash (lambda (path entry)
-                  (let ((matchlen (cl-mismatch path fname)))
-                    (when (or (not bestmatchlen) (< bestmatchlen matchlen))
-                      (setq bestmatch entry)
-                      (setq bestmatchlen matchlen)
-                      )))
+       (maphash #'(lambda (path entry)
+                    (let ((matchlen (cl-mismatch path fname)))
+                      (when (or (not bestmatchlen) (< bestmatchlen matchlen))
+                        (setq bestmatch entry)
+                        (setq bestmatchlen matchlen)
+                        )))
                 (oref this compdb))
        bestmatch)
      )))
@@ -583,7 +540,7 @@ an d pick one that is present in the compdb hashtable."
     ;; Remove targets without a buffer - we won't be able to update the compilation entry otherwise
     (oset this targets
           (remq nil
-                (mapcar (lambda (T) (when (get-file-buffer (expand-file-name (oref T path) oldprojdir)) T))
+                (mapcar #'(lambda (T) (when (get-file-buffer (expand-file-name (oref T path) oldprojdir)) T))
                         (oref this targets))))
 
     ;; Update all remaining targets
@@ -624,10 +581,10 @@ an d pick one that is present in the compdb hashtable."
     ;; Short-cut: set the current configuration directory by supplying a full pathname to :compdb-file
     (let ((confdir (or (file-name-directory (oref this compdb-file)) ".")))
       (oset this configuration-directories
-            (mapcar (lambda (c)
-                      (if (string= c (oref this configuration-default))
-                          confdir nil))
-                  (oref this configurations)))))
+            (mapcar #'(lambda (c)
+                        (if (string= c (oref this configuration-default))
+                            confdir nil))
+                    (oref this configurations)))))
 
   (let ((nconfigs (length (oref this configurations)))
         (ndirs (length (oref this configuration-directories))))
@@ -749,6 +706,48 @@ to :compdb-file"
     (ede-compdb-target tname :name tname :project this)))
 
 ;;; Utility functions:
+
+(defun ede-object-system-include-path ()
+  "Return the system include path for the current buffer."
+  (when ede-object
+    (ede-system-include-path ede-object)))
+
+(defun ede-compdb-flymake-init ()
+  "Init function suitable for use with function `flymake-mode'."
+  (when (and ede-object (slot-boundp ede-object :compilation) (oref ede-object :compilation))
+    (let* ((comp (oref ede-object compilation))
+           (args (split-string (get-command-line comp)))
+           (temp-file (flymake-init-create-temp-buffer-copy
+                       'flymake-create-temp-inplace))
+           ret)
+      ;; Process args, building up a new list as we go. Each new element is added to the head of the
+      ;; list, so we need to reverse it once done
+      (while args
+        (let ((argi (pop args)))
+          (cond
+            ;; substitude /dev/null for the output file
+           ((equal argi "-o")
+            (setq ret (cons "/dev/null" (cons argi ret)))
+            (pop args))
+
+            ;; substitute -S for -c (ie just compile, don't assemble)
+           ((equal argi "-c")
+            (setq ret (cons "-S" ret)))
+
+           ;; Don't do any makefile generation
+           ((member argi '("-M" "-MM" "-MMD" "-MG" "-MP" "-MD")))
+           ((member argi '("-MF" "-MT" "-MQ"))
+            (pop args))
+
+            ;; substitute temp-file for the input file
+           ((file-equal-p (expand-file-name argi (oref comp directory)) buffer-file-name)
+            (setq ret (cons temp-file ret)))
+           (t
+            (setq ret (cons argi ret)))
+           )))
+      (setq ret (reverse ret))
+      (list (pop ret) ret (oref comp directory))
+      )))
 
 (defun ff-other-file-list ()
   "Return a list of the 'other' files for the current buffer.

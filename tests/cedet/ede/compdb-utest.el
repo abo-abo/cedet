@@ -147,7 +147,7 @@
      (unwind-protect
          (progn ,@body)
        (ede-delete-project-from-global-list ,proj))))
-(def-edebug-spec with-temp-ede-project (sexp body))
+(def-edebug-spec with-temp-ede-project (place sexp body))
 
 ;;; ede-compdb-entry tests
 
