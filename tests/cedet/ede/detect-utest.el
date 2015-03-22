@@ -654,7 +654,6 @@ If LOADEDP is nil, make sure non were loaded."
   (setq ede-arduino-preferences-file ede-detect-utest-arduino-fname
 	ede-arduino-appdir ede-detect-utest-arduino-install)
 
-
   (let ((mypath (expand-file-name "arduino" (ede-detect-utest-basedir))))
     ;;(message "Dirmatch Location: %s" mypath)
     (save-excursion
@@ -665,12 +664,14 @@ If LOADEDP is nil, make sure non were loaded."
 	      "board=ede_utest\n")	      
       (save-buffer 0)
       ) )
+
   ;; Now we need to augment the existing autoloader for arduino.
   (let* ((arduinoauto (object-assoc 'ede/arduino :file
 				    ede-project-class-files))
 	 (adm (oref arduinoauto proj-root-dirmatch)))
     ;; Splice the new tmp pref file into the system.
     (oset adm :fromconfig ede-arduino-preferences-file)
+    (slot-makeunbound adm 'configdatastash)
     )
   
   )
