@@ -463,6 +463,45 @@ End of search list.
           (should (file-equal-p builddir (nth 2 ret)))
           ))))))
 
+(ert-deftest ede-compdb-compile-tests ()
+  "Tests that we build the correct command lines for compiling."
+  :expected-result (if ede-compdb-test-cmake-path :passed :failed)
+  (with-cmake-build-directory
+   builddir :generate-compdb
+   (cl-letf*
+       ((compile-cmd nil)
+        (compile-dir nil)
+        ((symbol-function 'compile) (lambda (c)
+                                      (setq compile-cmd c)
+                                      (setq compile-dir default-directory)))
+        (maincpp (expand-file-name "main.cpp" ede-compdb-test-srcdir)))
+
+     (with-temp-ede-project
+      proj (ede-compdb-project "TESTPROJ"
+                               :compdb-file (expand-file-name "compile_commands.json" builddir)
+                               :build-exe "make" :compile-args `("-j3")
+                               :file (expand-file-name "CMakeLists.txt" ede-compdb-test-srcdir))
+
+      (with-temp-file-buffer buf maincpp
+        ;; Compile entire project
+        (ede-compile-project)
+        (should (file-equal-p compile-dir builddir))
+        (should (string= compile-cmd "make -j3"))
+
+        ;; Compile target from compdb
+        (ede-compile-target)
+        (should (file-equal-p compile-dir builddir))
+        (should (string-match (regexp-quote maincpp) compile-cmd))
+        (should (string-match (regexp-quote "main.cpp.o") compile-cmd))
+
+        ;; Compile phony target
+        (project-compile-target proj "foo")
+        (should (file-equal-p compile-dir builddir))
+        (should (string= compile-cmd "make -j3 foo"))
+
+        )))))
+
+
 ;;; ede-ninja-project tests
 
 (ert-deftest ede-compdb-ninja-autoload-project ()

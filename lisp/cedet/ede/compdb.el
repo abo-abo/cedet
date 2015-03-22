@@ -128,10 +128,12 @@
    (configuration-directories
     :type (or list string) :initarg :configuration-directories
     :documentation "For each configuration, a directory in which to locate the configuration database file. This is evaluated relative to :directory")
-   (build-command
-    :type (or string symbol) :initarg :build-command :initform "make -k"
-    :documentation "A shell command to build the entire project. Invoked from the configuration directory.")
-
+   (build-exe
+    :type (or string symbol) :initarg :build-exe :initform "make"
+    :documentation "Executable used to build the entire project or target. Invoked from the configuration directory.")
+   (compile-args
+    :type list :initarg :compile-args :initform '("-k")
+    :documentation "Extra arguments passed to build-exe when compiling.")
    (compdb
     :initform (make-hash-table :test 'equal)
     :documentation "The compilation database, as a hash keyed on source file")
@@ -147,9 +149,12 @@
 
 (defclass ede-ninja-project (ede-compdb-project)
   (
-   (build-command
-    :type (or string symbol) :initarg :build-command :initform ede-compdb-ninja-exe-path
-    :documentation "A shell command to build the entire project. Invoked from the configuration directory.")
+   (build-exe
+    :type (or string symbol) :initarg :build-exe :initform ede-compdb-ninja-exe-path
+    :documentation "Path to ninja executable.")
+   (compile-args
+    :type list :initarg :compile-args :initform '()
+    :documentation "Extra arguments passed to ninja when compiling.")
    (phony-targets
     :type list :initform '()
     :documentation "Phony targets which ninja can build")
@@ -438,10 +443,10 @@ If EXCLUDECOMPILER is t, we ignore compiler include paths"
 
 ;;; ede-compdb-project methods:
 
-(defmethod get-build-command ((this ede-compdb-project))
+(defmethod get-build-exe ((this ede-compdb-project))
   "Returns the build command for THIS project.  If the
-build-command slot is set to a symbol, the symbol is evaluated."
-  (let ((cmd (oref this :build-command)))
+build-exe slot is set to a symbol, the symbol is evaluated."
+  (let ((cmd (oref this :build-exe)))
     (if (symbolp cmd)
         (symbol-value cmd)
       cmd)))
@@ -669,23 +674,29 @@ If one doesn't exist, create a new one."
     ans))
 
 (defmethod project-compile-target ((this ede-compdb-project) target)
-  "Build TARGET using :build-command. TARGET may be an instance
+  "Build TARGET using :build-exe. TARGET may be an instance
 of `ede-compdb-target' or a string."
   (project-rescan-if-needed this)
   (let* ((entry (when (and (ede-compdb-target-p target) (slot-boundp target :compilation))
                   (oref target compilation)))
          (cmd (if entry (get-command-line entry)
-                (concat (get-build-command this) " "
-                        (if (ede-compdb-target-p target) (oref target name) target))))
+                ;; If no compdb entry, just invoke the build-exe with the target name
+                (combine-and-quote-strings
+                 `(,(get-build-exe this)
+                   ,@(when (slot-boundp this :compile-args) (oref this compile-args))
+                   ,(if (ede-compdb-target-p target) (oref target name) target)))))
          (default-directory (if entry (oref entry directory)
                               (current-configuration-directory this))))
     (compile cmd)
     ))
 
 (defmethod project-compile-project ((this ede-compdb-project))
-  "Build the project THIS using :build-command"
-  (let ((default-directory (current-configuration-directory this)))
-    (compile (get-build-command this))
+  "Build the project THIS using :build-exe"
+  (let ((default-directory (current-configuration-directory this))
+        (cmd (combine-and-quote-strings
+              `(,(get-build-exe this)
+                ,@(when (slot-boundp this :compile-args) (oref this compile-args))))))
+    (compile cmd)
     ))
 
 (defmethod ede-menu-items-build ((_this ede-compdb-project) &optional _current)
@@ -711,7 +722,7 @@ of `ede-compdb-target' or a string."
     (let ((default-directory (current-configuration-directory this)))
       (oset this phony-targets nil)
       (erase-buffer)
-      (call-process (get-build-command this) nil t t "-f" (oref this compdb-file) "-t" "targets" "all")
+      (call-process (get-build-exe this) nil t t "-f" (oref this compdb-file) "-t" "targets" "all")
       (let ((progress-reporter (make-progress-reporter "Scanning targets..." (point-min) (point-max))))
         (goto-char 0)
         (while (re-search-forward ede-ninja-target-regexp nil t)
@@ -728,7 +739,8 @@ into the current buffer. COMPDB-PATH represents the current path
 to :compdb-file"
   (message "Building compilation database...")
   (let ((default-directory (file-name-directory compdb-path)))
-    (apply 'call-process `(,(get-build-command this) nil t nil "-f" ,(oref this compdb-file) "-t" "compdb" ,@(oref this :build-rules)))))
+    (apply 'call-process `(,(get-build-exe this) nil t nil
+                           "-f" ,(oref this compdb-file) "-t" "compdb" ,@(oref this :build-rules)))))
 
 (defmethod project-interactive-select-target ((this ede-ninja-project) prompt)
   "Interactively query for a target. Argument PROMPT is the prompt to use."
