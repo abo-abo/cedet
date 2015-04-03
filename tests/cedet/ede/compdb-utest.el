@@ -55,7 +55,7 @@
 
 (defvar ede-compdb-test-srcdir
   (file-name-as-directory
-   (expand-file-name "src/compdb" (when load-file-name (file-name-directory load-file-name)))))
+   (expand-file-name "src/compdb/utest" (when load-file-name (file-name-directory load-file-name)))))
 
 (defvar ede-compdb-test-cmake-path
   (executable-find "cmake")
