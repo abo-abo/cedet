@@ -84,23 +84,23 @@ void foo(void) {
 
 namespace ms_structs
 {
-   struct aaa
+   struct ms_aaa
    {
      int xx;
    };
 
-   struct bbb
+   struct ms_bbb
    {
-     struct aaa yy;
+     struct ms_aaa yy;
    };
-}
+};
 
 int fun()
 {
    using namespace ms_structs;
-   struct bbb zz;
-   int uu = zz.// -5-
+   struct ms_bbb mszz;
+   int uu = mszz.// -5-
      ; // #5# ( "yy" )
-   int kk = zz.yy.// -6-
+   int kk = mszz.yy.// -6-
      ; // #6# ( "xx" )
 }
