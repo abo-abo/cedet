@@ -303,16 +303,15 @@ This helper manages the mark, buffer switching, and pulsing."
   ;; implementation instead.
   (when (semantic-tag-prototype-p dest)
     (let* ((refs (semantic-analyze-tag-references dest))
-	   (impl (semantic-analyze-refs-impl refs t))
-	   )
+           (impl (semantic-analyze-refs-impl refs t)))
       (when impl (setq dest (car impl)))))
 
   ;; Make sure we have a place to go...
   (if (not (and (or (semantic-tag-with-position-p dest)
-		    (semantic-tag-get-attribute dest :line))
-		(semantic-tag-file-name dest)))
+                    (semantic-tag-get-attribute dest :line))
+                (semantic-tag-file-name dest)))
       (error "Tag %s has no buffer information"
-	     (semantic-format-tag-name dest)))
+             (semantic-format-tag-name dest)))
 
   ;; Once we have the tag, we can jump to it.  Here
   ;; are the key bits to the jump:
@@ -320,16 +319,15 @@ This helper manages the mark, buffer switching, and pulsing."
   ;; 1) Push the mark, so you can pop global mark back, or
   ;;    use semantic-mru-bookmark mode to do so.
   (push-mark)
-  (when (fboundp 'push-tag-mark)
-    (push-tag-mark))
+  (when (fboundp 'xref-push-marker-stack)
+    (xref-push-marker-stack))
   ;; 2) Visits the tag.
   (semantic-go-to-tag dest)
   ;; 3) go-to-tag doesn't switch the buffer in the current window,
   ;;    so it is like find-file-noselect.  Bring it forward.
   (switch-to-buffer (current-buffer))
   ;; 4) Fancy pulsing.
-  (pulse-momentary-highlight-one-line (point))
-  )
+  (pulse-momentary-highlight-one-line (point)))
 
 (declare-function semantic-decoration-include-visit "semantic/decorate/include")
 
@@ -340,63 +338,58 @@ Uses `semantic-analyze-current-context' output to identify an accurate
 origin of the code at point."
   (interactive "d")
   (let* ((ctxt (semantic-analyze-current-context point))
-	 (pf (and ctxt (reverse (oref ctxt prefix))))
-	 ;; In the analyzer context, the PREFIX is the list of items
-	 ;; that makes up the code context at point.  Thus the c++ code
-	 ;; this.that().theothe
-	 ;; would make a list:
-	 ;; ( ("this" variable ..) ("that" function ...) "theothe")
-	 ;; Where the first two elements are the semantic tags of the prefix.
-	 ;;
-	 ;; PF is the reverse of this list.  If the first item is a string,
-	 ;; then it is an incomplete symbol, thus we pick the second.
-	 ;; The second cannot be a string, as that would have been an error.
-	 (first (car pf))
-	 (second (nth 1 pf))
-	 )
+         (pf (and ctxt (reverse (oref ctxt prefix))))
+         ;; In the analyzer context, the PREFIX is the list of items
+         ;; that makes up the code context at point.  Thus the c++ code
+         ;; this.that().theothe
+         ;; would make a list:
+         ;; ( ("this" variable ..) ("that" function ...) "theothe")
+         ;; Where the first two elements are the semantic tags of the prefix.
+         ;;
+         ;; PF is the reverse of this list.  If the first item is a string,
+         ;; then it is an incomplete symbol, thus we pick the second.
+         ;; The second cannot be a string, as that would have been an error.
+         (first (car pf))
+         (second (nth 1 pf)))
     (cond
-     ((semantic-tag-p first)
-      ;; We have a match.  Just go there.
-      (semantic-ia--fast-jump-helper first))
+      ((semantic-tag-p first)
+       ;; We have a match.  Just go there.
+       (semantic-ia--fast-jump-helper first))
 
-     ((semantic-tag-p second)
-      ;; Because FIRST failed, we should visit our second tag.
-      ;; HOWEVER, the tag we actually want that was only an unfound
-      ;; string may be related to some take in the datatype that belongs
-      ;; to SECOND.  Thus, instead of visiting second directly, we
-      ;; can offer to find the type of SECOND, and go there.
-      (let ((secondclass (car (reverse (oref ctxt prefixtypes)))))
-	(cond
-	 ((and (semantic-tag-with-position-p secondclass)
-	       (y-or-n-p (format "Could not find `%s'.  Jump to %s? "
-				 first (semantic-tag-name secondclass))))
-	  (semantic-ia--fast-jump-helper secondclass)
-	  )
-	 ;; If we missed out on the class of the second item, then
-	 ;; just visit SECOND.
-	 ((and (semantic-tag-p second)
-	       (y-or-n-p (format "Could not find `%s'.  Jump to %s? "
-				 first (semantic-tag-name second))))
-	  (semantic-ia--fast-jump-helper second)
-	  ))))
+      ((semantic-tag-p second)
+       ;; Because FIRST failed, we should visit our second tag.
+       ;; HOWEVER, the tag we actually want that was only an unfound
+       ;; string may be related to some take in the datatype that belongs
+       ;; to SECOND.  Thus, instead of visiting second directly, we
+       ;; can offer to find the type of SECOND, and go there.
+       (let ((secondclass (car (reverse (oref ctxt prefixtypes)))))
+         (cond
+           ((and (semantic-tag-with-position-p secondclass)
+                 (y-or-n-p (format "Could not find `%s'.  Jump to %s? "
+                                   first (semantic-tag-name secondclass))))
+            (semantic-ia--fast-jump-helper secondclass))
+           ;; If we missed out on the class of the second item, then
+           ;; just visit SECOND.
+           ((and (semantic-tag-p second)
+                 (y-or-n-p (format "Could not find `%s'.  Jump to %s? "
+                                   first (semantic-tag-name second))))
+            (semantic-ia--fast-jump-helper second)))))
 
-     ((semantic-tag-of-class-p (semantic-current-tag) 'include)
-      ;; Just borrow this cool fcn.
-      (require 'semantic/decorate/include)
+      ((semantic-tag-of-class-p (semantic-current-tag) 'include)
+       ;; Just borrow this cool fcn.
+       (require 'semantic/decorate/include)
 
-      ;; Push the mark, so you can pop global mark back, or
-      ;; use semantic-mru-bookmark mode to do so.
-      (push-mark)
-      (when (fboundp 'push-tag-mark)
-	(push-tag-mark))
+       ;; Push the mark, so you can pop global mark back, or
+       ;; use semantic-mru-bookmark mode to do so.
+       (push-mark)
+       (when (fboundp 'xref-push-marker-stack)
+         (xref-push-marker-stack))
 
-      (semantic-decoration-include-visit)
-      )
+       (semantic-decoration-include-visit))
 
-     (t
-      (error "Could not find suitable jump point for %s"
-	     first))
-     )))
+      (t
+       (error "Could not find suitable jump point for %s"
+              first)))))
 
 ;;;###autoload
 (defun semantic-ia-fast-mouse-jump (evt)
