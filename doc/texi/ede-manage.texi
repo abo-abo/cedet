@@ -8,7 +8,7 @@ you just need enable @ede{} and use @code{ede-new} to get started.
 To enable @ede{} in your @file{.emacs} file.
 
 @example
-(ede-minor-mode 1)
+(global-ede-mode 1)
 @end example
 
 Once you have @ede{} enabled, you can create a project.  This chapter
@@ -307,6 +307,19 @@ when it offers the command line you want to use to run your program.
 @node Managed Projects
 @chapter Managed Projects
 
+A managed project is one where everything needed to compile and
+distribute your project is handled by @ede{}.  These projects are
+created with @code{ede-new}, files are grouped into targets, and
+compiler flags are setup through @ede{}.  All Makefiles and build
+process files are then created for you.
+
+Managed projects are useful for users just starting out, and have
+relatively simple requirements on the build system.  It is also OK to
+use @ede{} to get started, and hand-edit some parts of your
+configure.ac and add custom rules through the @ede{} customization
+interface as you learn more about build systems, or to just eventually
+delete @file{Project.ede} and start hand editing the generated files.
+
 @menu
 * Creating a project::          Creating a project.
 * Modifying your project::      Adding and removing files and targets.
@@ -324,12 +337,9 @@ ede-new}, or click on the @samp{Create Project} item in the
 @samp{Development} menu.
 
 The @command{ede-new} command prompts for the type of project you
-would like to create.  Each project type has its own benefits or
-language specific enhancements.  Not all projects that @ede{} supports
-also allow creating a new project.  Projects such as @code{emacs}
-or @code{linux} are designed to recognize existing projects only.
-Project types such as @samp{Make} and @samp{Automake} do support
-creating new project types with @command{ede-new}.
+would like to create.  It also prompts you for a name.  The name is
+what will be used when creating distribution files.
+
 
 @itemize
 @item
