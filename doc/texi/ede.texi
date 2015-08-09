@@ -70,11 +70,12 @@ modify this GNU manual.''
 simplifies integrating project management workflows in Emacs.  It has
 features typical of other IDEs such as compiling and running programs.
 
-Using an @ede{} project is as simple as enabling @code{(ede-minor-mode
-1)} and letting @ede{} identify the files associated with your build
-environment.  If you are just starting out, @ede{} can manage or
-create your makefiles and other build environment files, allowing
-you to concentrate on writing code rather than support files.
+Using an @ede{} project is as simple as enabling
+@code{(global-ede-mode 1)} and letting @ede{} identify the files
+associated with your build environment.  If you are just starting out,
+@ede{} can manage or create your makefiles and other build environment
+files, allowing you to concentrate on writing code rather than support
+files.
 
 @ede{} is also a place to configure your projects so other tools in
 Emacs know more about your code, and can help you.  For example, the
@@ -124,9 +125,9 @@ support modifying @b{target}s or all @b{project} options.
 
 @section What is a project?
 
-In @ede{}, a project represents a directory hierarchy.  An @ede{}
-project is represented by set of meta data and command features.  Not
-all projects support all types of meta data or commands.
+In @ede{}, a project consists of a directory hierarchy, a set of meta
+data, command features, and a set of targets. Not all projects support
+all types of meta data or commands.
 
 The meta-data includes the project's version number, and might include
 additional features, such as C/C++ Include and System Include paths,
@@ -160,7 +161,7 @@ If you already have a project, all you need to do is enable
 @ede{} in your @code{.emacs} file like this:
 
 @example
-(ede-minor-mode 1)
+(global-ede-mode 1)
 @end example
 
 If there is a project type for your code, @ede{} will automatically
@@ -206,17 +207,35 @@ will be all set after you enable @ede{} with no extra configuration
 needed.
 
 @menu
+* Automake::                    Project for hand-written Automake.
 * Emacs::                       Project for working with Emacs.
 * Linux::                       Project for working with Linux kernels.
+* Java::                        Projects for different generic Java builds
 * Android projects::            Projects for Android development
 * Arduino projects::            Projects for Arduino sketches
 @end menu
 
+@node Automake
+@section Hand Written Automake
+
+The Automake project identifies projects where the Automake files
+have been hand written.  This project reads your Automake files, and
+can identify your targets and can build your project.
+
+Each source file can be identified with one or more targets, and you
+can use the @code{ede-compile-target} command, or build the whole
+project.
+
+This project type can also keep your Automake files updated by adding
+new source files to different targets for you.
+
+If you edit your Automake files by hand, be sure to use
+@code{ede-rescan-toplevel} to keep @ede{} up to date.
 
 @node Emacs
 @section Emacs
 
-The @code{ede-emacs} project automatically identifies an Emacs source
+The Emacs project automatically identifies an Emacs source
 tree, and enables an @ede{} project mode for it.
 
 It pre-populates the C Preprocessor symbol map for correct parsing,
@@ -233,6 +252,21 @@ pre-populates the C Preprocessor symbol map for reasonable parsing,
 and has an optimized include file identification function.  It also
 supports @semantic{} code parsing with customized platform defines
 set.
+
+@node Java
+@section Java projects
+
+There are several Java projects for detecting some common Java build
+environments and setting them up for @semantic{} parsing and
+compilation.  Supported projects are:
+
+@itemize
+@item Ant
+@item Maven
+@item Lein
+@end itemize
+
+@@TODO Write some more.
 
 @node Android projects
 @section Android projects
@@ -260,11 +294,19 @@ SDK.
 @node Arduino projects
 @section Arduino projects
 
-An arduino project will read your @file{~/.arduino/preferences.txt}
-file, and identify your sketches.  You will still need the Arduino IDE
-to set up your preferences and locate your arduino.  After using the
-IDE, Emacs will be able to find your sketches, compile them, and
-upload them to your arduino.
+An arduino project will read your preferences.  On Linux it will
+automatically find @file{~/.arduino/preferences.txt} file, and
+identify your sketches.  On windows, you will need to tell Emacs where
+your preferences are, perhaps like this:
+
+@example
+(setq ede-arduino-preferences-file
+    (expand-file-name (substitute-in-file-name "$APPDATA/Arduino15/preferences.txt")))
+@end example
+
+You will still need the Arduino IDE to set up your preferences and
+locate your arduino.  After using the IDE, Emacs will be able to find
+your sketches, compile them, and upload them to your arduino.
 
 If you have the @file{arduino} command on your path, @ede{} will be
 able to find your SDK and compile your programs.
