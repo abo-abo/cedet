@@ -1,6 +1,6 @@
 ;;; semantic/wisent/python.el --- Semantic support for Python
 
-;; Copyright (C) 2002, 2004, 2006-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2002, 2004, 2006-2015 Free Software Foundation, Inc.
 
 ;; Author: Richard Kim  <emacs18@gmail.com>
 ;; Maintainer: Richard Kim  <emacs18@gmail.com>
@@ -559,9 +559,6 @@ Shortens 'code' tags, but passes through for others."
 				      (package  . "Package")
 				      (code . "Code")))
    )
-
-;;;###autoload
-(add-hook 'python-mode-hook 'wisent-python-default-setup)
 
 ;; Make sure the newer python modes pull in the same python
 ;; mode overrides.
