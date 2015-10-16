@@ -55,9 +55,11 @@ struct mystruct1 {
 
 typedef mystruct1 td_name1, td_name2;
 
-int var1;
+extern static inline int var1;
 
+extern \"C\" {
 float funp1(char arg11, char arg12);
+}
 
 char fun2(int arg_21, int arg_22) /*1*/
 {
@@ -134,19 +136,23 @@ int calc_sv(int);
       ("mystruct1" type (:type "class") nil nil)
       :type "typedef"))
     ("var1" variable
-     (:type "int")
+     (:typemodifiers ("extern" "static" "inline")
+      :type "int")
      nil (overlay 156 165 "sutest.c"))
     ("funp1" function
-     (:prototype-flag t :arguments
-		      (("arg11" variable
-			(:type "char")
-			(reparse-symbol arg-sub-list)
-			(overlay 179 190 "sutest.c"))
-		       ("arg12" variable
-			(:type "char")
-			(reparse-symbol arg-sub-list)
-			(overlay 191 202 "sutest.c")))
-		      :type "float")
+     (:typemodifiers ("extern" "\"C\"")
+      :type "float"
+      :arguments
+      (("arg11" variable
+	(:type "char")
+	(reparse-symbol arg-sub-list)
+	(overlay 179 190 "sutest.c"))
+       ("arg12" variable
+	(:type "char")
+	(reparse-symbol arg-sub-list)
+	(overlay 191 202 "sutest.c")))
+      :prototype-flag t
+      )
      nil (overlay 167 203 "sutest.c"))
     ("fun2" function
      (:arguments
