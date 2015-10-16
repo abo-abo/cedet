@@ -1,6 +1,6 @@
 ;;; semantic/utest.el --- Tests for semantic's parsing system.
 
-;;; Copyright (C) 2003, 2004, 2007, 2008, 2009, 2010, 2011, 2012, 2014 Eric M. Ludlam
+;;; Copyright (C) 2003, 2004, 2007, 2008, 2009, 2010, 2011, 2012, 2014, 2015 Eric M. Ludlam
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -52,6 +52,8 @@ struct mystruct1 {
   char slot12;
   float slot13;
 };
+
+typedef mystruct1 td_name1, td_name2;
 
 int var1;
 
@@ -123,6 +125,14 @@ int calc_sv(int);
 	(overlay 138 151 "sutest.c")))
       :type "struct")
      nil (overlay 88 154 "sutest.c"))
+    ("td_name2" type 
+     (:typedef
+      ("mystruct1" type (:type "class") nil nil)
+      :type "typedef"))
+    ("td_name1" type 
+     (:typedef
+      ("mystruct1" type (:type "class") nil nil)
+      :type "typedef"))
     ("var1" variable
      (:type "int")
      nil (overlay 156 165 "sutest.c"))
