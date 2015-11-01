@@ -528,9 +528,7 @@ End of search list.
 (ert-deftest ede-compdb-ninja-autoload-project ()
   "Tests autoloading of ninja projects when rules.ninja files are discovered"
   :expected-result (if (and ede-compdb-test-cmake-path
-                            ede-compdb-ninja-exe-path
-                            ;; Hack until we can fix ninja rule detection logic...
-                            (inversion-< (cmake-version) '("release" 3 2 0)))
+                            ede-compdb-ninja-exe-path)
                        :passed :failed)
   (with-insource-build
    dir :generate-ninja
