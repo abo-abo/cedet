@@ -271,9 +271,14 @@ process that is followed when a new file is opened within an existing
 @item
 If the current buffer file is in the compilation database, that is used.
 @item
-If there is an "other" file associated with the current buffer which
-is also in the compilation database, that is used. The definition of
-an "other" file is almost exactly the same as that used by the the
+If the @uref{http://batsov.com/projectile/,Projectile} package is
+configured for the current buffer, the
+@code{projectile-get-other-files} function will be used to search for
+a matching entry in the compilation database.
+@item
+The standard emacs ``other'' file mechanism is also used to search for
+matching entries in the compilation database. The definition of an
+``other'' file is almost exactly the same as that used by the the
 built-in emacs function @code{ff-get-other-file}. By default,
 @code{ff-get-other-file} will search the current directory for an
 equivalent @file{.cpp} file, so if the current buffer is visiting an

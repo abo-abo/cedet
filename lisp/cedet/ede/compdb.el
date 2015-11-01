@@ -443,7 +443,8 @@ current configuration directory is used if CONFIG not set."
 (defmethod other-file-list ((_this ede-compdb-project) fname)
   "Returns a list of 'other' files for FNAME."
   ;; Use projectile-get-other-files if defined, or ff-other-file-list (see below) if not
-  (or (and (fboundp 'projectile-get-other-files)
+  (or (and (fboundp 'projectile-project-p)
+           (projectile-project-p)
            (projectile-get-other-files fname (projectile-current-project-files) t))
       (ff-other-file-list)))
 
