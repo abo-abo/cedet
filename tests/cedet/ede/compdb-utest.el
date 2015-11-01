@@ -175,10 +175,9 @@
 (ert-deftest ede-compdb-parse-command-line ()
   "Tests parsing of command lines"
   (cl-letf*
-      ((cmdline "g++ -Dfoo -Dbar=baz -Uqux -isystem =/opt/quxx/include -I/opt/local/include -Iincludes -include bar.hpp -imacros config.h -isystem/opt/foo/include --sysroot=/sysroot main.cpp")
+      ((cmdline "g++ -Dfoo -Dbar=baz -Uqux -isystem =/opt/quxx/include -I/opt/local/include -include bar.hpp -imacros config.h -isystem/opt/foo/include -iquote includes --sysroot=/sysroot main.cpp")
        (e (compdb-entry "foo.cpp" :directory "." :command-line cmdline))
-       ;; expected include dirs
-       (incdirs `("/sysroot/opt/quxx/include/" "/opt/local/include/" ,(expand-file-name "includes/") "/opt/foo/include/" "."))
+
        ;; mock out ede-compdb-compiler-include-path
        ((symbol-function 'ede-compdb-compiler-include-path) (lambda (comp dir) '("/opt/g++/include"))))
 
@@ -188,8 +187,15 @@
     (should (equal '("qux") (oref e undefines)))
 
     (should (equal '("foo" "bar=baz") (get-defines e)))
-    (should (equal (append incdirs (list "/sysroot/opt/g++/include")) (get-include-path e)))
-    (should (equal incdirs (get-include-path e t)))
+
+    (should (equal
+             `("." "/opt/local/include/" "/sysroot/opt/quxx/include/" "/opt/foo/include/")
+             (get-system-include-path e t)))
+
+    (should (equal
+             `("." ,(expand-file-name "includes/") "/opt/local/include/" "/sysroot/opt/quxx/include/" "/opt/foo/include/")
+             (get-user-include-path e t)))
+
     (should (equal (mapcar #'expand-file-name '("config.h" "bar.hpp")) (get-includes e)))
     ))
 

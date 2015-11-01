@@ -110,9 +110,15 @@
    (compiler
     :type string :initarg :compiler
     :documentation "The compiler portion of the full command line (may be multi-word)")
-   (include-path
-    :type list :initarg :include-path :initform '()
-    :documentation "List of directories to search for include files")
+   (include-path-common
+    :type list :initarg :include-path-common :initform '()
+    :documentation "List of directories to search for include files, used for both user and system includes.")
+   (include-path-user
+    :type list :initarg :include-path-user :initform '()
+    :documentation "List of directories to search for user include files only.")
+   (include-path-system
+    :type list :initarg :include-path-system :initform '()
+    :documentation "List of directories to search for system include files only.")
    (includes
     :type list :initarg :includes :initform '()
     :documentation "List of implicitly included files")
@@ -282,7 +288,7 @@ from the command line (which is most of them!)"
   "Regex to identify directories which are relative to sysroot")
 
 (defmethod parse-command-line ((this compdb-entry))
-  "Parse the :command-line slot of THIS to derive :compiler, :include-path, etc."
+  "Parse the :command-line slot of THIS to derive :compiler, :include-path-common, etc."
   (let ((args (split-string (oref this command-line)))
         (seenopt nil)
         (case-fold-search nil))
@@ -301,9 +307,12 @@ from the command line (which is most of them!)"
            (object-add-to-list this :defines (cons (or argval (pop args)) eqval) t))
           (`"-U"
            (object-add-to-list this :undefines (or argval (pop args)) t))
-          ;; TODO: support gcc notation "=dir" where '=' is the sysroot prefix
-          ((or `"-I" `"-F" `"-isystem")
-           (object-add-to-list this :include-path (file-name-as-directory (or argval (pop args))) t))
+          (`"-I"
+           (object-add-to-list this :include-path-common (file-name-as-directory (or argval (pop args))) t))
+          (`"-isystem"
+           (object-add-to-list this :include-path-system (file-name-as-directory (or argval (pop args))) t))
+          (`"-iquote"
+           (object-add-to-list this :include-path-user (file-name-as-directory (or argval (pop args))) t))
           (`"-include"
            (object-add-to-list this :includes (pop args) t)) ;; append
           (`"-imacros"
@@ -317,18 +326,20 @@ from the command line (which is most of them!)"
         )
       )
 
-    ;; Add sysroot prefix to include-path
-    (when (slot-boundp this :sysroot)
-      (let ((rep (concat (regexp-quote (oref this sysroot)) "\\1")))
-        (cl-maplist
-         #'(lambda (d) (setcar d (replace-regexp-in-string ede-compdb-entry-sysroot-directory-rx rep (car d))))
-         (oref this include-path))))
+    ;; Fix up include-path-*
+    (dolist (PATH '(:include-path-common :include-path-system :include-path-user))
+      ;; Add sysroot prefix
+      (when (slot-boundp this :sysroot)
+        (let ((rep (concat (regexp-quote (oref this sysroot)) "\\1")))
+          (cl-maplist
+           #'(lambda (d) (setcar d (replace-regexp-in-string ede-compdb-entry-sysroot-directory-rx rep (car d))))
+           (slot-value this PATH))))
 
-    ;; Evaluate relative directories in include-path
-    (cl-maplist
-     #'(lambda (d) (setcar d (file-name-as-directory (expand-file-name (car d) (oref this directory)))))
-     (oref this include-path))
-    ))
+      ;; Evaluate relative directories in include-path-*
+      (cl-maplist
+       #'(lambda (d) (setcar d (file-name-as-directory (expand-file-name (car d) (oref this directory)))))
+       (slot-value this PATH))
+      )))
 
 (defmethod get-defines ((this compdb-entry))
   "Get the preprocessor defines for THIS compdb entry. Returns a list of strings, suitable for use with -D arguments."
@@ -340,18 +351,30 @@ from the command line (which is most of them!)"
                      (car def)))
    (oref this defines)))
 
-(defmethod get-include-path ((this compdb-entry) &optional excludecompiler)
+(defmethod get-system-include-path ((this compdb-entry) &optional excludecompiler)
   "Get the system include path used by THIS compdb entry.
 If EXCLUDECOMPILER is t, we ignore compiler include paths"
   (parse-command-line-if-needed this)
   (append
-   (oref this include-path)
    (list (oref this directory))
+   (oref this include-path-common)
+   (oref this include-path-system)
    (unless excludecompiler
      (let ((path (ede-compdb-compiler-include-path (oref this compiler) (oref this directory))))
        (if (slot-boundp this :sysroot)
            (mapcar #'(lambda (d) (concat (directory-file-name (oref this sysroot)) d)) path)
          path)))
+   ))
+
+(defmethod get-user-include-path ((this compdb-entry) &optional excludecompiler)
+  "Get the user include path used by THIS compdb entry.
+If EXCLUDECOMPILER is t, we ignore compiler include paths"
+  (parse-command-line-if-needed this)
+  (append
+   (list (oref this directory))
+   (oref this include-path-user)
+   ;; strip the leading "." from the system include path - we already inserted it
+   (cdr (get-system-include-path this excludecompiler))
    ))
 
 (defmethod get-includes ((this compdb-entry))
@@ -369,7 +392,9 @@ If EXCLUDECOMPILER is t, we ignore compiler include paths"
   (project-rescan-if-needed (oref this project))
   (let ((comp (oref this compilation)))
     (when comp
-      (get-include-path comp excludecompiler))))
+      ;; In CEDET terms there is no distinguishing between user and system includes - they are all
+      ;; viewed as 'system' includes.
+      (get-user-include-path comp excludecompiler))))
 
 (defmethod ede-preprocessor-map ((this ede-compdb-target))
   "Get the preprocessor map for target THIS."
