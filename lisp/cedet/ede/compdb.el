@@ -715,16 +715,84 @@ of `ede-compdb-target' or a string."
 (defconst ede-ninja-file-rule-decl-rx
   (rx
    line-start
-   (? space)
+   (* space)
    (or
-    (group "rule")
-    (group "include"))
-   (+ space)
+    (group "rule ")
+    (group "include ")
+    (: (group (+ (or alnum "_"))) (* space) "="))
+   (* space)
    ;; TODO: handle quoted filenames
    (group (+ (not space)))
    line-end)
-  "Regexp to match rule or include declarations in a ninja file."
-  )
+  "Regexp to match rule or include declarations in a Ninja file.")
+
+(defconst ede-ninja-variable-instance-rx
+  (rx
+   "$"
+   (or
+    (: "{" (group (+ (or alnum "_"))) "}")
+    (group (+ (or alnum "_"))))
+   )
+  "Regexp to match variable instances in Ninja files, eg $VAR or ${VAR}.")
+
+
+(defun ede-ninja-expand-vars (string vars)
+  "Return STRING with variables expanded from VARS.
+
+Ninja syntax is assumed, with $VAR and ${VAR} handled identically."
+  (save-match-data
+    (replace-regexp-in-string
+     ede-ninja-variable-instance-rx
+     #'(lambda (x) (or (cdr (assoc (or (match-string 1 x) (match-string 2 x)) vars)) x))
+     string t t)))
+
+
+(defun ede-ninja-scan-build-rules (file build-rules-rx &optional vars)
+  "Return Ninja build rules in FILE which match regexp BUILD-RULES-RX.
+
+FILE is scanned recursively looking for rule declarations. In
+order to do this effectively, the file is also scanned for
+``include'' declarations, and also for variable declarations
+which may be used within ``include'' declarations. VARS is used
+to pass variable definitions.
+
+This is a brute-force alternative in the event that the Ninja
+'rules' tool is not available."
+  (let (ret)
+    (when (symbolp build-rules-rx)
+      (setq build-rules-rx (symbol-value build-rules-rx)))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (while (re-search-forward ede-ninja-file-rule-decl-rx nil t)
+        (let ((arg (ede-ninja-expand-vars (match-string 4) vars)))
+          (cond
+           ((match-beginning 1)         ; rule arg
+            (when (string-match build-rules-rx arg)
+              (push arg ret)))
+           ((match-beginning 2)         ; include arg
+            (setq ret (nconc ret (ede-ninja-scan-build-rules arg build-rules-rx vars))))
+           ((match-beginning 3)         ; var=arg
+            (push (cons (match-string 3) arg) vars))
+           ))))
+    ret))
+
+(defmethod get-build-rules ((this ede-ninja-project))
+  "Returns a list of build rules to use when building the compilation database for the current project."
+  (append
+   (oref this :build-rules)
+   ;; TODO: Use the upcoming Ninja 'rules' tool, when supported.
+   (when (oref this build-rules-regexp)
+     (ede-ninja-scan-build-rules (oref this compdb-file) (oref this build-rules-regexp)))
+   ))
+
+(defmethod insert-compdb ((this ede-ninja-project) compdb-path)
+  "Use ninja's compdb tool to insert the compilation database
+into the current buffer. COMPDB-PATH represents the current path
+to :compdb-file"
+  (message "Building compilation database...")
+  (let ((default-directory (file-name-directory compdb-path)))
+    (apply 'call-process `(,(get-build-exe this) nil t nil
+                           "-f" ,(oref this compdb-file) "-t" "compdb" ,@(get-build-rules this)))))
 
 (defmethod project-rescan ((this ede-ninja-project))
   "Get ninja to describe the set of phony targets, add them to the target list"
@@ -743,46 +811,6 @@ of `ede-compdb-target' or a string."
           )
         (progress-reporter-done progress-reporter))
       )))
-
-(defun ede-ninja-scan-build-rules (file build-rules-rx)
-  "Return Ninja build rules in FILE which match regexp BUILD-RULES-RX.
-
-FILE is scanned recursively looking for declarations which match
-`ede-ninja-file-rule-decl-rx'.  This is a brute-force alternative
-in the event that the Ninja 'rules' tool is not available."
-  (let (ret)
-    (when (symbolp build-rules-rx)
-      (setq build-rules-rx (symbol-value build-rules-rx)))
-    (with-temp-buffer
-      (insert-file-contents file)
-      (while (re-search-forward ede-ninja-file-rule-decl-rx nil t)
-        (let ((arg (match-string 3)))
-          (cond
-           ((match-beginning 1)       ; "rule"
-            (when (string-match build-rules-rx arg)
-              (push arg ret)))
-           ((match-beginning 2)       ; "include"
-            (setq ret (nconc ret (ede-ninja-scan-build-rules arg build-rules-rx))))
-           ))))
-    ret))
-
-(defmethod get-build-rules ((this ede-ninja-project))
-  "Returns a list of build rules to use when building the compilation database for the current project."
-  (append
-   (oref this :build-rules)
-   ;; TODO: Use the upcoming Ninja 'rules' tool, when supported.
-   (when (slot-boundp this :build-rules-regexp)
-     (ede-ninja-scan-build-rules (oref this compdb-file) (oref this build-rules-regexp)))
-   ))
-
-(defmethod insert-compdb ((this ede-ninja-project) compdb-path)
-  "Use ninja's compdb tool to insert the compilation database
-into the current buffer. COMPDB-PATH represents the current path
-to :compdb-file"
-  (message "Building compilation database...")
-  (let ((default-directory (file-name-directory compdb-path)))
-    (apply 'call-process `(,(get-build-exe this) nil t nil
-                           "-f" ,(oref this compdb-file) "-t" "compdb" ,@(get-build-rules this)))))
 
 (defmethod project-interactive-select-target ((this ede-ninja-project) prompt)
   "Interactively query for a target. Argument PROMPT is the prompt to use."

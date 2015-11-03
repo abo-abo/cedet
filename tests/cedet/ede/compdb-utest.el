@@ -531,6 +531,30 @@ End of search list.
 
 ;;; ede-ninja-project tests
 
+(ert-deftest ede-compdb-ninja-expand-vars ()
+  "Tests resolving Ninja variable expansions."
+  (should (equal "abc/def"
+                 (ede-ninja-expand-vars "$A/${D}"
+                                        '(("A" . "abc") ("D" . "def")))))
+  )
+
+(ert-deftest ede-compdb-ninja-scan-build-rules ()
+  "Tests parsing of Ninja build file to determine build rules."
+  (cl-letf*
+      ((files '(("build.ninja" .
+                 "VAR1=rules.ninja
+VAR2=${VAR1}
+include $VAR2
+rule CXX_2")
+                ("rules.ninja" .
+                 "rule C_1
+rule CXX_1")))
+       ((symbol-function 'insert-file-contents)
+        (lambda (f) (insert (cdr (assoc f files))) (goto-char (point-min)))))
+    (should (equal '("CXX_1" "CXX_2")
+                   (sort (ede-ninja-scan-build-rules "build.ninja" "^CXX") #'string-lessp)))
+    ))
+
 (ert-deftest ede-compdb-ninja-autoload-project ()
   "Tests autoloading of ninja projects when rules.ninja files are discovered"
   :expected-result (if (and ede-compdb-test-cmake-path
